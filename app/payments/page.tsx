@@ -1,0 +1,131 @@
+import { redirect } from "next/navigation"
+import Link from "next/link"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { DashboardLayout } from "@/components/dashboard-layout"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { RecordPaymentForm } from "./record-payment-form"
+
+export default async function PaymentsPage() {
+  const session = await auth()
+  if (!session?.user) redirect("/login")
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+
+  const [activeLoans, todayPayments, todayTotal] = await Promise.all([
+    prisma.loan.findMany({
+      where: { status: { in: ["ACTIVE", "DELINQUENT"] } },
+      include: { member: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.payment.findMany({
+      where: {
+        paymentDate: { gte: todayStart, lt: tomorrowStart },
+      },
+      include: { loan: { select: { loanNo: true } } },
+      orderBy: { paymentDate: "desc" },
+    }),
+    prisma.payment.aggregate({
+      where: {
+        paymentDate: { gte: todayStart, lt: tomorrowStart },
+      },
+      _sum: { amount: true },
+    }),
+  ])
+
+  return (
+    <DashboardLayout>
+      <header className="flex h-16 shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2 px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-[orientation=vertical]:h-4"
+          />
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Payments</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      </header>
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Record payment</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Select a loan and enter amount. Principal, interest, and
+                penalty are applied automatically.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RecordPaymentForm
+                loans={activeLoans.map((l) => ({
+                  id: l.id,
+                  loanNo: l.loanNo,
+                  memberName: l.member.name,
+                  outstandingBalance: l.outstandingBalance,
+                }))}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Today&apos;s collections</CardTitle>
+              <p className="text-2xl font-bold">
+                ₱{(todayTotal._sum.amount ?? 0).toLocaleString("en-PH")}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {todayPayments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No payments recorded today.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {todayPayments.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex justify-between rounded border px-3 py-2 text-sm"
+                    >
+                      <span>
+                        {p.loan.loanNo} — ₱
+                        {p.amount.toLocaleString("en-PH")}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {new Date(p.paymentDate).toLocaleTimeString("en-PH", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+}

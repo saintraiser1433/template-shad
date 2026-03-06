@@ -1,0 +1,254 @@
+// MCFMP-CMLMS - Muslim Christian Fisherfolks Multi-Purpose Cooperative
+// Money Lending and Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  COLLECTOR
+  CREDIT_COMMITTEE
+  BOARD_OF_DIRECTORS
+  TREASURER
+  LOANS_CLERK
+  DISBURSING_STAFF
+  CASHIER
+  MEMBER
+}
+
+enum LoanType {
+  MEMBERSHIP_LOAN
+  MICRO_LOAN
+  REGULAR_LOAN
+  PRODUCTION_LOAN
+  SHORT_TERM_LOAN
+  LONG_TERM_LOAN
+  EDUCATIONAL_LOAN
+}
+
+enum ApplicationStatus {
+  PENDING
+  CIBI_REVIEW
+  MANAGER_REVIEW
+  COMMITTEE_REVIEW
+  BOARD_REVIEW
+  APPROVED
+  REJECTED
+  FUNDED
+  RELEASED
+}
+
+enum AmortizationType {
+  MONTHLY
+  DAILY
+  LUMPSUM
+}
+
+enum ReleaseMethod {
+  CASH
+  CHEQUE
+}
+
+enum LoanStatus {
+  ACTIVE
+  PAID
+  DELINQUENT
+  RENEWED
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  passwordHash   String    @map("password_hash")
+  role           Role      @default(MEMBER)
+  emailVerified  DateTime? @map("email_verified")
+  image          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  accounts       Account[]
+  sessions       Session[]
+  member         Member?
+  paymentsCollected Payment[] @relation("CollectedBy")
+}
+
+model Account {
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires     DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Member {
+  id              String   @id @default(cuid())
+  memberNo        String   @unique @map("member_no")
+  name            String
+  address         String?  @db.Text
+  contactNo       String?  @map("contact_no")
+  religion        String?
+  occupation      String?
+  cbu             Float    @default(0) // Capital Build Up in PHP
+  isRegularMember Boolean  @default(false) @map("is_regular_member")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  userId          String?  @unique @map("user_id")
+
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  loanApplications LoanApplication[]
+  loans            Loan[]
+}
+
+model LoanApplication {
+  id              String            @id @default(cuid())
+  applicationNo   String            @unique @map("application_no")
+  loanType        LoanType          @map("loan_type")
+  amount          Float
+  termMonths      Int?              @map("term_months")
+  termDays        Int?              @map("term_days")
+  purpose         String?           @db.Text
+  status          ApplicationStatus @default(PENDING)
+  approvalLevel   String?           @map("approval_level") // MANAGER | COMMITTEE | BOARD
+  // CI/BI 5C's fields
+  characterNotes  String?           @map("character_notes") @db.Text
+  capacityNotes   String?           @map("capacity_notes") @db.Text
+  capitalNotes    String?           @map("capital_notes") @db.Text
+  collateralNotes String?           @map("collateral_notes") @db.Text
+  conditionsNotes String?           @map("conditions_notes") @db.Text
+  cibiPassed      Boolean?          @map("cibi_passed")
+  submittedAt     DateTime?         @map("submitted_at")
+  approvedAt      DateTime?         @map("approved_at")
+  rejectedAt      DateTime?         @map("rejected_at")
+  rejectionReason String?           @map("rejection_reason") @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  memberId        String            @map("member_id")
+  loanProductId   String?           @map("loan_product_id")
+
+  member       Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  loanProduct  LoanProduct? @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
+  loan         Loan?
+}
+
+model Loan {
+  id                 String           @id @default(cuid())
+  loanNo             String           @unique @map("loan_no")
+  loanType           LoanType         @map("loan_type")
+  principalAmount    Float            @map("principal_amount")
+  interestRate       Float            @map("interest_rate") // per month or per term as per loan config
+  termMonths         Int?             @map("term_months")
+  termDays           Int?             @map("term_days")
+  amortizationType   AmortizationType @map("amortization_type")
+  outstandingBalance Float           @map("outstanding_balance")
+  status             LoanStatus      @default(ACTIVE)
+  releasedAt         DateTime?       @map("released_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  applicationId      String?         @unique @map("application_id")
+  memberId           String          @map("member_id")
+
+  application        LoanApplication?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  member             Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  amortizationSchedule AmortizationSchedule[]
+  payments           Payment[]
+  voucher            LoanVoucher?
+}
+
+model AmortizationSchedule {
+  id          String   @id @default(cuid())
+  dueDate     DateTime @map("due_date")
+  principal   Float
+  interest    Float
+  totalDue    Float    @map("total_due")
+  penalty     Float    @default(0)
+  isPaid      Boolean  @default(false) @map("is_paid")
+  paidAt      DateTime? @map("paid_at")
+  sequence    Int      // 1, 2, 3... for ordering
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  loanId      String   @map("loan_id")
+
+  loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  amount       Float
+  principal    Float
+  interest     Float
+  penalty      Float    @default(0)
+  paymentDate  DateTime @map("payment_date")
+  remarks      String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  loanId       String   @map("loan_id")
+  collectedById String? @map("collected_by_id")
+
+  loan         Loan  @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  collectedBy  User? @relation("CollectedBy", fields: [collectedById], references: [id], onDelete: SetNull)
+}
+
+model LoanVoucher {
+  id           String        @id @default(cuid())
+  voucherNo   String        @unique @map("voucher_no")
+  releaseMethod ReleaseMethod @map("release_method")
+  chequeNo     String?       @map("cheque_no")
+  releasedAt   DateTime      @map("released_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  loanId       String        @unique @map("loan_id")
+
+  loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+}
+
+model LoanProduct {
+  id             String   @id @default(cuid())
+  name           String
+  termMonthsMin  Int?
+  termMonthsMax  Int?
+  termDaysMin    Int?
+  termDaysMax    Int?
+  maxCbuPercent  Float?   // e.g. 80 means 80% of CBU
+  maxAmountFixed Float?   // fixed peso ceiling, optional
+  amortization   String   // e.g. "Monthly", "Daily", "Lump sum"
+  interestRate   Float    // e.g. 0.03 = 3% per month
+  interestLabel  String   // e.g. "3% per month diminishing"
+  penaltyRate    Float    // e.g. 0.02 = 2% per month
+  penaltyLabel   String   // e.g. "2% per month based on amortization delayed"
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  loanApplications LoanApplication[]
+}

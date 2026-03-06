@@ -20,6 +20,27 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Demo accounts (seeded)
+
+Run the seed script:
+
+```bash
+npm run db:seed
+```
+
+Then login at `/login` with any of these **local/dev-only** credentials:
+
+- **ADMIN**: `admin@mcfmp.com` / `admin123`
+- **MANAGER**: `manager@mcfmp.com` / `manager123`
+- **COLLECTOR**: `collector@mcfmp.com` / `collector123`
+- **CREDIT_COMMITTEE**: `committee@mcfmp.com` / `committee123`
+- **BOARD_OF_DIRECTORS**: `board@mcfmp.com` / `board123`
+- **TREASURER**: `treasurer@mcfmp.com` / `treasurer123`
+- **LOANS_CLERK**: `loansclerk@mcfmp.com` / `loansclerk123`
+- **DISBURSING_STAFF**: `disbursing@mcfmp.com` / `disbursing123`
+- **CASHIER**: `cashier@mcfmp.com` / `cashier123`
+- **MEMBER**: `member@mcfmp.com` / `member123`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
