@@ -2,11 +2,13 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { createActivityLog } from "@/lib/activity-log"
 import type { Role } from "@prisma/client"
 
 declare module "next-auth" {
   interface User {
     role?: Role
+    cbu?: number
   }
   interface Session {
     user: {
@@ -15,6 +17,8 @@ declare module "next-auth" {
       name?: string | null
       image?: string | null
       role?: Role
+      /** Member's Capital Build Up (savings), set when role is MEMBER */
+      cbu?: number
     }
   }
 }
@@ -40,8 +44,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         const user = await prisma.user.findUnique({
           where: { email: String(credentials.email).toLowerCase() },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            role: true,
+            passwordHash: true,
+            status: true,
+          },
         })
-        if (!user?.passwordHash) return null
+        if (!user?.passwordHash || user.status === "INACTIVE") return null
         const valid = await bcrypt.compare(
           credentials.password,
           user.passwordHash
@@ -58,6 +71,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      if (user?.id) {
+        createActivityLog({
+          userId: user.id,
+          action: "LOGIN",
+          entityType: "User",
+          entityId: user.id,
+          details: user.email ?? undefined,
+        }).catch(() => {})
+      }
+      return true
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = user.id
@@ -65,10 +90,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token
     },
-    session({ session, token }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id ?? token.sub!
         session.user.role = token.role
+        if (token.role === "MEMBER" && token.id) {
+          const member = await prisma.member.findUnique({
+            where: { userId: token.id },
+            select: { cbu: true },
+          })
+          session.user.cbu = member?.cbu ?? undefined
+        }
       }
       return session
     },

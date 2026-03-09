@@ -2,10 +2,9 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleHeader } from "@/components/module-header"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
@@ -17,7 +16,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { UpdateApplicationStatus } from "@/components/update-application-status"
+import { ApprovalApplicationActions } from "@/components/approval-application-actions"
+
+const APPROVAL_STATUS_BY_ROLE: Record<string, string[]> = {
+  MANAGER: ["MANAGER_REVIEW"],
+  CREDIT_COMMITTEE: ["COMMITTEE_REVIEW"],
+  BOARD_OF_DIRECTORS: ["BOARD_REVIEW"],
+  ADMIN: ["MANAGER_REVIEW", "COMMITTEE_REVIEW", "BOARD_REVIEW"],
+}
 
 export default async function LoansForApprovalPage({
   searchParams,
@@ -26,13 +32,17 @@ export default async function LoansForApprovalPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  const role = session.user.role
+  const allowedRoles = ["ADMIN", "MANAGER", "CREDIT_COMMITTEE", "BOARD_OF_DIRECTORS"]
+  if (!role || !allowedRoles.includes(role)) redirect("/dashboard")
 
   const { search } = await searchParams
   const q = search?.trim()
+  const statuses = APPROVAL_STATUS_BY_ROLE[role] ?? ["MANAGER_REVIEW", "COMMITTEE_REVIEW", "BOARD_REVIEW"]
 
   const applications = await prisma.loanApplication.findMany({
     where: {
-      status: { in: ["MANAGER_REVIEW", "COMMITTEE_REVIEW", "BOARD_REVIEW"] },
+      status: { in: statuses as ("MANAGER_REVIEW" | "COMMITTEE_REVIEW" | "BOARD_REVIEW")[] },
       ...(q
         ? {
             OR: [
@@ -49,13 +59,8 @@ export default async function LoansForApprovalPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -71,22 +76,24 @@ export default async function LoansForApprovalPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
-              <CardTitle>Applications for approval</CardTitle>
+              <h2 className="text-base font-semibold">Applications for approval</h2>
               <p className="text-sm text-muted-foreground">
                 Manager (up to ₱100k), Credit Committee, or Board of Directors.
               </p>
             </div>
-            <TableSearchForm
-              basePath="/loans/for-approval"
-              defaultSearch={search}
-              placeholder="Search application no or member..."
-            />
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/loans/for-approval"
+                defaultSearch={search}
+                placeholder="Search application no or member..."
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -141,9 +148,19 @@ export default async function LoansForApprovalPage({
                           <Badge variant="secondary">{app.status}</Badge>
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <UpdateApplicationStatus
-                            applicationId={app.id}
-                            currentStatus={app.status}
+                          <ApprovalApplicationActions
+                            application={{
+                              id: app.id,
+                              amount: app.amount,
+                              status: app.status,
+                              characterNotes: app.characterNotes,
+                              capacityNotes: app.capacityNotes,
+                              capitalNotes: app.capitalNotes,
+                              collateralNotes: app.collateralNotes,
+                              conditionsNotes: app.conditionsNotes,
+                              cibiPassed: app.cibiPassed,
+                            }}
+                            currentUserRole={role ?? undefined}
                           />
                         </td>
                       </tr>

@@ -61,9 +61,8 @@ export function RecordPaymentButton({ loanId }: { loanId: string }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="action" size="icon-sm" title="Record payment">
           <Banknote className="size-4" />
-          Record payment
         </Button>
       </SheetTrigger>
       <SheetContent>

@@ -3,9 +3,8 @@ import Link from "next/link"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { ModuleHeader } from "@/components/module-header"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -60,13 +59,8 @@ export default async function LoanTypesPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -78,14 +72,9 @@ export default async function LoanTypesPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-        <div className="px-4">
-          <Button asChild size="sm">
-            <Link href="/loan-types/new">Add loan type</Link>
-          </Button>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <div className="space-y-1">
           <h1 className="text-base font-semibold">Type of loans</h1>
           <p className="text-sm text-muted-foreground">
@@ -93,12 +82,15 @@ export default async function LoanTypesPage({
           </p>
         </div>
         <Card>
-          <CardHeader className="flex items-center justify-end space-y-0 pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
             <TableSearchForm
               basePath="/loan-types"
               defaultSearch={q}
               placeholder="Search loan type..."
             />
+            <Button asChild size="sm">
+              <Link href="/loan-types/new">Add loan type</Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {totalCount === 0 ? (
@@ -119,6 +111,9 @@ export default async function LoanTypesPage({
                         </th>
                         <th className="px-3 py-1.5 text-left font-medium">
                           Term
+                        </th>
+                        <th className="px-3 py-1.5 text-left font-medium">
+                          CBU %
                         </th>
                         <th className="px-3 py-1.5 text-left font-medium">
                           Max amount
@@ -157,9 +152,7 @@ export default async function LoanTypesPage({
                         }
 
                         let maxAmount = "-"
-                        if (p.maxCbuPercent && !p.maxAmountFixed) {
-                          maxAmount = `${p.maxCbuPercent}% of Capital Build Up`
-                        } else if (p.maxAmountFixed) {
+                        if (p.maxAmountFixed) {
                           maxAmount = `₱${p.maxAmountFixed.toLocaleString(
                             "en-PH"
                           )}`
@@ -177,6 +170,9 @@ export default async function LoanTypesPage({
                               {p.name}
                             </td>
                             <td className="px-3 py-1.5">{term}</td>
+                            <td className="px-3 py-1.5 tabular-nums">
+                              {p.maxCbuPercent != null ? `${p.maxCbuPercent}%` : "-"}
+                            </td>
                             <td className="px-3 py-1.5">{maxAmount}</td>
                             <td className="px-3 py-1.5">{p.amortization}</td>
                             <td className="px-3 py-1.5">{interest}</td>

@@ -5,7 +5,6 @@ import { z } from "zod"
 import bcrypt from "bcryptjs"
 
 const createMemberSchema = z.object({
-  memberNo: z.string().min(1),
   name: z.string().min(1),
   address: z.string().optional(),
   contactNo: z.string().optional(),
@@ -58,15 +57,19 @@ export async function POST(req: NextRequest) {
     )
   }
   const data = parsed.data
-  const existing = await prisma.member.findUnique({
-    where: { memberNo: data.memberNo },
+
+  // Auto-generate memberNo as MCF-001, MCF-002, ...
+  const last = await prisma.member.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { memberNo: true },
   })
-  if (existing) {
-    return NextResponse.json(
-      { error: "Member number already exists" },
-      { status: 409 }
-    )
+  let nextNum = 1
+  if (last?.memberNo) {
+    const match = last.memberNo.match(/^MCF-(\d+)$/i)
+    if (match) nextNum = parseInt(match[1], 10) + 1
   }
+  const memberNo = `MCF-${String(nextNum).padStart(3, "0")}`
+
   let userId: string | undefined
   if (data.email) {
     const passwordHash = data.password
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
   }
   const member = await prisma.member.create({
     data: {
-      memberNo: data.memberNo,
+      memberNo,
       name: data.name,
       address: data.address,
       contactNo: data.contactNo,

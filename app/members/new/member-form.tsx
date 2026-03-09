@@ -14,9 +14,16 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { RELIGIONS } from "@/lib/religions"
 
 const schema = z.object({
-  memberNo: z.string().min(1, "Member number is required"),
   name: z.string().min(1, "Name is required"),
   address: z.string().optional(),
   contactNo: z.string().optional(),
@@ -46,6 +53,7 @@ export function MemberForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     watch,
+    setValue,
   } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: {
@@ -60,7 +68,13 @@ export function MemberForm({
   async function onSubmit(data: FormData) {
     setError(null)
     const payload = {
-      ...data,
+      name: data.name,
+      address: data.address || undefined,
+      contactNo: data.contactNo || undefined,
+      religion: data.religion || undefined,
+      occupation: data.occupation || undefined,
+      cbu: data.cbu,
+      isRegularMember: data.isRegularMember,
       email: data.email || undefined,
       password: data.password || undefined,
     }
@@ -88,19 +102,9 @@ export function MemberForm({
           </p>
         )}
         <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="memberNo">Member number *</FieldLabel>
-            <Input
-              id="memberNo"
-              {...register("memberNo")}
-              placeholder="e.g. MCF-001"
-            />
-            {errors.memberNo && (
-              <p className="text-sm text-destructive">
-                {errors.memberNo.message}
-              </p>
-            )}
-          </Field>
+          <p className="text-xs text-muted-foreground">
+            Member number will be auto-assigned (e.g. MCF-001, MCF-002).
+          </p>
           <Field>
             <FieldLabel htmlFor="name">Full name *</FieldLabel>
             <Input id="name" {...register("name")} placeholder="Juan Dela Cruz" />
@@ -128,8 +132,22 @@ export function MemberForm({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="religion">Religion</FieldLabel>
-            <Input id="religion" {...register("religion")} />
+            <FieldLabel>Religion</FieldLabel>
+            <Select
+              value={watch("religion") ?? ""}
+              onValueChange={(v) => setValue("religion", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select religion" />
+              </SelectTrigger>
+              <SelectContent>
+                {RELIGIONS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="occupation">Occupation</FieldLabel>

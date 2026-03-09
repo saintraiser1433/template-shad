@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { ModuleHeader } from "@/components/module-header"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,15 +19,15 @@ export default async function NewLoanTypePage() {
   if (!session?.user) redirect("/login")
   if (session.user.role === "MEMBER") redirect("/dashboard")
 
+  const requirements = await prisma.requirement.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, sortOrder: true },
+  })
+
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -43,15 +43,15 @@ export default async function NewLoanTypePage() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
           <CardHeader>
             <CardTitle>New loan type</CardTitle>
           </CardHeader>
           <CardContent>
-            <LoanTypeForm />
+            <LoanTypeForm requirements={requirements} />
           </CardContent>
         </Card>
       </div>

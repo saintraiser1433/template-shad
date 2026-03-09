@@ -16,6 +16,7 @@ const loanProductSchema = z.object({
   interestLabel: z.string().min(1),
   penaltyRate: z.number().min(0),
   penaltyLabel: z.string().min(1),
+  requirementIds: z.array(z.string()).optional(),
 })
 
 export async function GET(
@@ -31,11 +32,26 @@ export async function GET(
   }
 
   const { id } = await params
-  const product = await prisma.loanProduct.findUnique({ where: { id } })
+  const product = await prisma.loanProduct.findUnique({
+    where: { id },
+    include: {
+      requirements: {
+        include: { requirement: true },
+        orderBy: { requirement: { sortOrder: "asc" } },
+      },
+    },
+  })
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
-  return NextResponse.json(product)
+  return NextResponse.json({
+    ...product,
+    requirements: product.requirements.map((r) => ({
+      id: r.requirement.id,
+      name: r.requirement.name,
+      sortOrder: r.requirement.sortOrder,
+    })),
+  })
 }
 
 export async function PUT(
@@ -60,12 +76,49 @@ export async function PUT(
     )
   }
 
-  const product = await prisma.loanProduct.update({
-    where: { id },
-    data: parsed.data,
+  const { requirementIds, ...data } = parsed.data
+
+  const product = await prisma.$transaction(async (tx) => {
+    await tx.loanProduct.update({
+      where: { id },
+      data,
+    })
+    if (requirementIds !== undefined) {
+      await tx.loanProductRequirement.deleteMany({
+        where: { loanProductId: id },
+      })
+      if (requirementIds.length > 0) {
+        await tx.loanProductRequirement.createMany({
+          data: requirementIds.map((requirementId) => ({
+            loanProductId: id,
+            requirementId,
+          })),
+        })
+      }
+    }
+    return tx.loanProduct.findUnique({
+      where: { id },
+      include: {
+        requirements: {
+          include: { requirement: true },
+          orderBy: { requirement: { sortOrder: "asc" } },
+        },
+      },
+    })
   })
 
-  return NextResponse.json(product)
+  if (!product) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
+  return NextResponse.json({
+    ...product,
+    requirements: product.requirements.map((r) => ({
+      id: r.requirement.id,
+      name: r.requirement.name,
+      sortOrder: r.requirement.sortOrder,
+    })),
+  })
 }
 
 export async function DELETE(

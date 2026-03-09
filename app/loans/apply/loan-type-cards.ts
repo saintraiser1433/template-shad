@@ -8,8 +8,11 @@ export type LoanTypeOption = {
   maxCbuPercent: number | null
   maxAmountFixed: number | null
   amortization: string
+  interestRate: number
   interestLabel: string
+  penaltyRate: number
   penaltyLabel: string
+  requirements?: { id: string; name: string }[]
 }
 
 export function formatTerm(p: LoanTypeOption): string {
@@ -28,9 +31,12 @@ export function formatTerm(p: LoanTypeOption): string {
 }
 
 export function formatMaxAmount(p: LoanTypeOption): string {
-  if (p.maxCbuPercent != null && p.maxAmountFixed == null)
-    return `${p.maxCbuPercent}% of Capital Build Up`
   if (p.maxAmountFixed != null)
     return `₱${p.maxAmountFixed.toLocaleString("en-PH")}`
   return "-"
+}
+
+export function formatCbuRequirement(p: LoanTypeOption): string {
+  if (p.maxCbuPercent != null) return `CBU ${p.maxCbuPercent}% of loan`
+  return "CBU -"
 }

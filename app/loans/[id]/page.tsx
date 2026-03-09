@@ -1,13 +1,13 @@
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
+import { FileText } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { ModuleHeader } from "@/components/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -33,7 +33,8 @@ export default async function LoanDetailPage({
     where: { id },
     include: {
       member: true,
-      application: true,
+      application: { include: { loanProduct: true } },
+      voucher: true,
       amortizationSchedule: { orderBy: { sequence: "asc" } },
       payments: { orderBy: { paymentDate: "desc" }, take: 20 },
     },
@@ -43,13 +44,8 @@ export default async function LoanDetailPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -65,13 +61,13 @@ export default async function LoanDetailPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Loan details</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge
                 variant={
                   loan.status === "ACTIVE"
@@ -85,6 +81,19 @@ export default async function LoanDetailPage({
               </Badge>
               {(loan.status === "ACTIVE" || loan.status === "DELINQUENT") && (
                 <RecordPaymentButton loanId={loan.id} />
+              )}
+              {loan.voucher ? (
+                <Button variant="action" size="icon-sm" asChild title="View voucher">
+                  <Link href={`/loans/${loan.id}/voucher`}>
+                    <FileText className="size-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="action" size="icon-sm" asChild title="Create voucher">
+                  <Link href={`/loans/${loan.id}/voucher`}>
+                    <FileText className="size-4" />
+                  </Link>
+                </Button>
               )}
             </div>
           </CardHeader>
@@ -109,6 +118,38 @@ export default async function LoanDetailPage({
                   </Link>
                 </p>
               </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Member CBU
+                </p>
+                <p className="font-medium">
+                  ₱{loan.member.cbu.toLocaleString("en-PH")}
+                </p>
+              </div>
+              {loan.application?.loanProduct?.maxCbuPercent != null && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    CBU requirement (% of loan)
+                  </p>
+                  <p className="font-medium">
+                    {loan.application.loanProduct.maxCbuPercent}%
+                  </p>
+                </div>
+              )}
+              {loan.application?.loanProduct?.maxCbuPercent != null && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Required CBU
+                  </p>
+                  <p className="font-medium">
+                    ₱
+                    {(
+                      loan.principalAmount *
+                      (loan.application.loanProduct.maxCbuPercent / 100)
+                    ).toLocaleString("en-PH")}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Type</p>
                 <p className="font-medium">

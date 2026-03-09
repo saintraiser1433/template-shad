@@ -23,6 +23,16 @@ enum Role {
   MEMBER
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum LoanType {
   MEMBERSHIP_LOAN
   MICRO_LOAN
@@ -64,20 +74,25 @@ enum LoanStatus {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
+  id             String     @id @default(cuid())
+  email          String     @unique
   name           String?
-  passwordHash   String    @map("password_hash")
-  role           Role      @default(MEMBER)
-  emailVerified  DateTime? @map("email_verified")
+  passwordHash   String     @map("password_hash")
+  role           Role       @default(MEMBER)
+  status         UserStatus @default(ACTIVE)
+  emailVerified  DateTime?  @map("email_verified")
   image          String?
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  accounts       Account[]
-  sessions       Session[]
-  member         Member?
-  paymentsCollected Payment[] @relation("CollectedBy")
+  accounts            Account[]
+  sessions            Session[]
+  member              Member?
+  paymentsCollected   Payment[] @relation("CollectedBy")
+  applicationsAssigned LoanApplication[] @relation("CollectorAssigned")
+  documentsUploaded   Document[] @relation("UploadedBy")
+  notifications       Notification[]
+  activityLogs       ActivityLog[]
 }
 
 model Account {
@@ -115,18 +130,19 @@ model VerificationToken {
 }
 
 model Member {
-  id              String   @id @default(cuid())
-  memberNo        String   @unique @map("member_no")
+  id              String       @id @default(cuid())
+  memberNo        String       @unique @map("member_no")
   name            String
-  address         String?  @db.Text
-  contactNo       String?  @map("contact_no")
+  address         String?      @db.Text
+  contactNo       String?      @map("contact_no")
   religion        String?
   occupation      String?
-  cbu             Float    @default(0) // Capital Build Up in PHP
-  isRegularMember Boolean  @default(false) @map("is_regular_member")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  userId          String?  @unique @map("user_id")
+  cbu             Float        @default(0) // Capital Build Up in PHP
+  isRegularMember Boolean      @default(false) @map("is_regular_member")
+  status          MemberStatus @default(ACTIVE) @map("status")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  userId          String?      @unique @map("user_id")
 
   user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
   loanApplications LoanApplication[]
@@ -154,14 +170,18 @@ model LoanApplication {
   approvedAt      DateTime?         @map("approved_at")
   rejectedAt      DateTime?         @map("rejected_at")
   rejectionReason String?           @map("rejection_reason") @db.Text
+  approvalRemarks String?           @map("approval_remarks") @db.Text
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   memberId        String            @map("member_id")
   loanProductId   String?           @map("loan_product_id")
+  collectorId     String?           @map("collector_id")
 
   member       Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   loanProduct  LoanProduct? @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
+  collector    User?       @relation("CollectorAssigned", fields: [collectorId], references: [id], onDelete: SetNull)
   loan         Loan?
+  documents    Document[]
 }
 
 model Loan {
@@ -233,6 +253,16 @@ model LoanVoucher {
   loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
 }
 
+model Requirement {
+  id        String   @id @default(cuid())
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  loanProducts LoanProductRequirement[]
+  documents    Document[]
+}
+
 model LoanProduct {
   id             String   @id @default(cuid())
   name           String
@@ -251,4 +281,59 @@ model LoanProduct {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   loanApplications LoanApplication[]
+  requirements     LoanProductRequirement[]
+}
+
+model LoanProductRequirement {
+  loanProductId  String @map("loan_product_id")
+  requirementId  String @map("requirement_id")
+
+  loanProduct LoanProduct @relation(fields: [loanProductId], references: [id], onDelete: Cascade)
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@id([loanProductId, requirementId])
+}
+
+model Document {
+  id            String   @id @default(cuid())
+  fileName      String   @map("file_name")
+  fileUrl       String   @map("file_url")
+  fileSize      Int?     @map("file_size")
+  mimeType      String?   @map("mime_type")
+  category      String   // REQUIREMENT | PHOTO | INVESTIGATION
+  applicationId String?  @map("application_id")
+  requirementId String?  @map("requirement_id")
+  uploadedById  String?  @map("uploaded_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application  LoanApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requirement  Requirement?     @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  uploadedBy   User?            @relation("UploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  type      String   // LOAN_APPROVED | LOAN_REJECTED | CIBI_ASSIGNED
+  link      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  action     String   // e.g. LOGIN, USER_CREATED, LOAN_CREATED, PAYMENT_RECORDED
+  entityType String?  @map("entity_type") // User, Member, Loan, Payment, etc.
+  entityId   String?  @map("entity_id")
+  details    String?  @db.Text // JSON or short description
+  ip         String?
+  userAgent  String?  @map("user_agent") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  userId     String?  @map("user_id")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

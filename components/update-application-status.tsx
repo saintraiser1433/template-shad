@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -35,13 +36,20 @@ const LABELS: Record<string, string> = {
 export function UpdateApplicationStatus({
   applicationId,
   currentStatus,
+  role,
 }: {
   applicationId: string
   currentStatus: string
+  role?: string
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const options = NEXT_STATUS[currentStatus] ?? []
+  let options = NEXT_STATUS[currentStatus] ?? []
+
+  // Collectors should not see the "Send to CI/BI" action; they already ARE the CI/BI role.
+  if (role === "COLLECTOR") {
+    options = options.filter((s) => s !== "CIBI_REVIEW")
+  }
 
   async function setStatus(status: ApplicationStatus) {
     setLoading(true)
@@ -67,8 +75,8 @@ export function UpdateApplicationStatus({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={loading}>
-          {loading ? "Updating…" : "Update status"}
+        <Button variant="action" size="icon-sm" disabled={loading} title="Update status">
+          <ChevronDown className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

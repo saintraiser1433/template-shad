@@ -16,15 +16,17 @@ const loanTypeEnum = z.enum([
   "EDUCATIONAL_LOAN",
 ])
 
-const createApplicationSchema = z.object({
-  memberId: z.string().min(1),
-  loanProductId: z.string().min(1).optional(),
-  loanType: loanTypeEnum.optional(),
-  amount: z.number().positive(),
-  termMonths: z.number().int().positive().optional(),
-  termDays: z.number().int().positive().optional(),
-  purpose: z.string().optional(),
-}).refine(
+const createApplicationSchema = z
+  .object({
+    memberId: z.string().min(1),
+    loanProductId: z.string().min(1).optional(),
+    loanType: loanTypeEnum.optional(),
+    amount: z.coerce.number().positive(),
+    termMonths: z.coerce.number().int().positive().optional(),
+    termDays: z.coerce.number().int().positive().optional(),
+    purpose: z.string().optional(),
+  })
+  .refine(
   (data) => data.loanProductId != null || data.loanType != null,
   { message: "Either loanProductId or loanType is required", path: ["loanType"] }
 )
@@ -77,6 +79,48 @@ export async function POST(req: NextRequest) {
   if (!goodStanding) {
     return NextResponse.json(
       { error: "Member must be in good standing (regular member with at least ₱20,000 CBU)" },
+      { status: 400 }
+    )
+  }
+
+  // Enforce one active/incomplete loan at a time per member
+  const existingLoan = await prisma.loan.findFirst({
+    where: {
+      memberId,
+      status: {
+        in: ["ACTIVE", "DELINQUENT", "RENEWED"],
+      },
+    },
+    select: { loanNo: true, status: true },
+  })
+  if (existingLoan) {
+    return NextResponse.json(
+      {
+        error:
+          "You already have an existing loan that is not yet fully paid. Please complete your current loan before applying for a new one.",
+      },
+      { status: 400 }
+    )
+  }
+
+  // Enforce one active/pending loan application per member
+  const existingApplication = await prisma.loanApplication.findFirst({
+    where: {
+      memberId,
+      // Allow only applications that were explicitly rejected; everything else blocks a new one
+      status: {
+        not: "REJECTED",
+      },
+    },
+    select: { applicationNo: true, status: true },
+  })
+
+  if (existingApplication) {
+    return NextResponse.json(
+      {
+        error:
+          "You already have a pending or in‑process loan application. Please wait for it to be completed before applying again.",
+      },
       { status: 400 }
     )
   }

@@ -2,8 +2,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { ModuleHeader } from "@/components/module-header"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,28 +22,51 @@ export default async function LoanApplyPage({
   if (!session?.user) redirect("/login")
 
   const { memberId } = await searchParams
-  const [members, loanProducts] = await Promise.all([
-    prisma.member.findMany({
-      orderBy: { memberNo: "asc" },
-      where: {
-        isRegularMember: true,
-        cbu: { gte: 20000 },
-      },
-    }),
+  const isMemberRole = session.user.role === "MEMBER"
+
+  const [membersResult, loanProducts] = await Promise.all([
+    isMemberRole
+      ? prisma.member.findFirst({
+          where: { userId: session.user.id },
+          select: { id: true, memberNo: true, name: true, cbu: true },
+        }).then((m) => (m ? [m] : []))
+      : prisma.member.findMany({
+          orderBy: { memberNo: "asc" },
+          where: {
+            isRegularMember: true,
+            cbu: { gte: 20000 },
+          },
+        }),
     prisma.loanProduct.findMany({
       orderBy: { name: "asc" },
+      include: {
+        requirements: {
+          include: { requirement: true },
+          orderBy: { requirement: { sortOrder: "asc" } },
+        },
+      },
     }),
   ])
 
+  const members = Array.isArray(membersResult) ? membersResult : []
+  const currentMemberId = isMemberRole && members.length === 1 ? members[0].id : undefined
+
+  if (isMemberRole && members.length === 0) {
+    redirect("/dashboard?error=member_not_linked")
+  }
+
+  const loanProductsWithReqs = loanProducts.map((p) => ({
+    ...p,
+    requirements: p.requirements.map((r) => ({
+      id: r.requirement.id,
+      name: r.requirement.name,
+    })),
+  }))
+
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -60,9 +82,9 @@ export default async function LoanApplyPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <LoanApplicationForm
           members={members.map((m) => ({
             id: m.id,
@@ -70,8 +92,9 @@ export default async function LoanApplyPage({
             name: m.name,
             cbu: m.cbu,
           }))}
-          loanProducts={loanProducts}
-          defaultMemberId={memberId ?? undefined}
+          loanProducts={loanProductsWithReqs}
+          defaultMemberId={currentMemberId ?? memberId ?? undefined}
+          currentMemberId={currentMemberId}
         />
       </div>
     </DashboardLayout>

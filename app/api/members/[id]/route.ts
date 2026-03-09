@@ -27,6 +27,13 @@ export async function GET(
   return NextResponse.json({ ...member, goodStanding })
 }
 
+const { z } = await import("zod")
+const patchSchema = z.object({
+  name: z.string().min(1).optional(),
+  religion: z.string().optional().nullable(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+})
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,17 +44,21 @@ export async function PATCH(
   }
   const { id } = await params
   const body = await req.json()
+  const parsed = patchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const data = parsed.data
+  const updateData: Parameters<typeof prisma.member.update>[0]["data"] = {}
+  if (data.name !== undefined) updateData.name = data.name
+  if (data.religion !== undefined) updateData.religion = data.religion
+  if (data.status !== undefined) updateData.status = data.status
   const member = await prisma.member.update({
     where: { id },
-    data: {
-      name: body.name,
-      address: body.address,
-      contactNo: body.contactNo,
-      religion: body.religion,
-      occupation: body.occupation,
-      cbu: body.cbu,
-      isRegularMember: body.isRegularMember,
-    },
+    data: updateData,
   })
   return NextResponse.json(member)
 }

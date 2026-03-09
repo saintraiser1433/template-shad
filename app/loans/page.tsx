@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { Eye } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleHeader } from "@/components/module-header"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
+import { MemberApplicationsTable } from "./member-applications-table"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -30,32 +31,50 @@ export default async function LoansPage({
 
   const { search } = await searchParams
   const q = search?.trim()
+  const isMember = session.user.role === "MEMBER"
+
+  let memberIdFilter: string | undefined
+  if (isMember) {
+    const member = await prisma.member.findFirst({
+      where: { userId: session.user.id },
+      select: { id: true },
+    })
+    if (member) memberIdFilter = member.id
+  }
 
   const loans = await prisma.loan.findMany({
-    where: q
-      ? {
-          OR: [
-            { loanNo: { contains: q, mode: "insensitive" } },
-            { member: { name: { contains: q, mode: "insensitive" } } },
-            { member: { memberNo: { contains: q, mode: "insensitive" } } },
-          ],
-        }
-      : undefined,
+    where: {
+      ...(memberIdFilter ? { memberId: memberIdFilter } : {}),
+      ...(q
+        ? {
+            OR: [
+              { loanNo: { contains: q, mode: "insensitive" } },
+              { member: { name: { contains: q, mode: "insensitive" } } },
+              { member: { memberNo: { contains: q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     include: {
       member: { select: { id: true, memberNo: true, name: true } },
     },
   })
 
+  const applications = memberIdFilter
+    ? await prisma.loanApplication.findMany({
+        where: { memberId: memberIdFilter },
+        orderBy: { createdAt: "desc" },
+        include: {
+          loanProduct: { select: { name: true } },
+        },
+      })
+    : []
+
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -67,9 +86,9 @@ export default async function LoansPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <div className="space-y-1">
           <h1 className="text-base font-semibold">Loans</h1>
           <p className="text-sm text-muted-foreground">
@@ -77,7 +96,7 @@ export default async function LoansPage({
           </p>
         </div>
         <Card>
-          <CardHeader className="flex items-center justify-end space-y-0 pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
             <TableSearchForm
               basePath="/loans"
               defaultSearch={search}
@@ -145,8 +164,10 @@ export default async function LoansPage({
                           </Badge>
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/loans/${loan.id}`}>View</Link>
+                          <Button variant="action" size="icon-sm" asChild title="View">
+                            <Link href={`/loans/${loan.id}`}>
+                              <Eye className="size-4" />
+                            </Link>
                           </Button>
                         </td>
                       </tr>
@@ -160,6 +181,31 @@ export default async function LoansPage({
             </div>
           </CardContent>
         </Card>
+
+        {memberIdFilter && (
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold">Loan applications</h2>
+                <p className="text-xs text-muted-foreground">
+                  Your submitted loan requests and their approval status.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <MemberApplicationsTable
+                rows={applications.map((app) => ({
+                  id: app.id,
+                  applicationNo: app.applicationNo,
+                  typeLabel: app.loanProduct?.name ?? app.loanType.replace(/_/g, " "),
+                  amount: app.amount,
+                  status: app.status,
+                  rejectionReason: app.rejectionReason ?? null,
+                }))}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   )

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function CreateLoanFromApplication({
@@ -33,12 +34,13 @@ export function CreateLoanFromApplication({
 
   return (
     <Button
-      variant="default"
-      size="sm"
+      variant="action"
+      size="icon-sm"
       onClick={handleCreate}
       disabled={loading}
+      title={loading ? "Creating…" : "Create loan"}
     >
-      {loading ? "Creating…" : "Create loan"}
+      <Wallet className="size-4" />
     </Button>
   )
 }

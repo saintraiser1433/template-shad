@@ -2,10 +2,9 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleHeader } from "@/components/module-header"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
@@ -27,6 +26,9 @@ export default async function LoansForFundingPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  const role = session.user.role
+  const allowedRoles = ["ADMIN", "TREASURER", "LOANS_CLERK", "DISBURSING_STAFF", "CASHIER"]
+  if (!role || !allowedRoles.includes(role)) redirect("/dashboard")
 
   const { search } = await searchParams
   const q = search?.trim()
@@ -50,13 +52,8 @@ export default async function LoansForFundingPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -72,23 +69,25 @@ export default async function LoansForFundingPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
-              <CardTitle>Approved — for funding</CardTitle>
+              <h2 className="text-base font-semibold">Approved — for funding</h2>
               <p className="text-sm text-muted-foreground">
                 Treasurer funds approved loans. Create loan and schedule, then
                 mark funded.
               </p>
             </div>
-            <TableSearchForm
-              basePath="/loans/for-funding"
-              defaultSearch={search}
-              placeholder="Search application no or member..."
-            />
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/loans/for-funding"
+                defaultSearch={search}
+                placeholder="Search application no or member..."
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">

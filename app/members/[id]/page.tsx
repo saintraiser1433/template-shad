@@ -1,13 +1,13 @@
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
+import { Eye } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { ModuleHeader } from "@/components/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -58,13 +58,8 @@ export default async function MemberDetailPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -80,9 +75,9 @@ export default async function MemberDetailPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Member profile</CardTitle>
@@ -147,20 +142,27 @@ export default async function MemberDetailPage({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
               <CardTitle>Loans</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Loans under this member with principal, outstanding, and status.
               </p>
             </div>
-            {goodStanding && (
-              <Button size="sm" asChild>
-                <Link href={`/loans/apply?memberId=${member.id}`}>
-                  Apply for loan
-                </Link>
-              </Button>
-            )}
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath={`/members/${member.id}`}
+                defaultSearch={search}
+                placeholder="Search loan no..."
+              />
+              {goodStanding && (
+                <Button size="sm" asChild>
+                  <Link href={`/loans/apply?memberId=${member.id}`}>
+                    Apply for loan
+                  </Link>
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {member.loans.length === 0 ? (
@@ -169,13 +171,6 @@ export default async function MemberDetailPage({
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex justify-end">
-                  <TableSearchForm
-                    basePath={`/members/${member.id}`}
-                    defaultSearch={search}
-                    placeholder="Search loan no..."
-                  />
-                </div>
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-xs">
                   <thead>
@@ -226,8 +221,10 @@ export default async function MemberDetailPage({
                           </Badge>
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/loans/${loan.id}`}>View</Link>
+                          <Button variant="action" size="icon-sm" asChild title="View">
+                            <Link href={`/loans/${loan.id}`}>
+                              <Eye className="size-4" />
+                            </Link>
                           </Button>
                         </td>
                       </tr>

@@ -16,6 +16,7 @@ const loanProductSchema = z.object({
   interestLabel: z.string().min(1),
   penaltyRate: z.number().min(0),
   penaltyLabel: z.string().min(1),
+  requirementIds: z.array(z.string()).optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -43,9 +44,24 @@ export async function GET(req: NextRequest) {
   const products = await prisma.loanProduct.findMany({
     where,
     orderBy: { createdAt: "desc" },
+    include: {
+      requirements: {
+        include: { requirement: true },
+        orderBy: { requirement: { sortOrder: "asc" } },
+      },
+    },
   })
 
-  return NextResponse.json(products)
+  return NextResponse.json(
+    products.map((p) => ({
+      ...p,
+      requirements: p.requirements.map((r) => ({
+        id: r.requirement.id,
+        name: r.requirement.name,
+        sortOrder: r.requirement.sortOrder,
+      })),
+    }))
+  )
 }
 
 export async function POST(req: NextRequest) {
@@ -66,10 +82,37 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const { requirementIds, ...data } = parsed.data
   const product = await prisma.loanProduct.create({
-    data: parsed.data,
+    data: {
+      ...data,
+      requirements:
+        requirementIds && requirementIds.length > 0
+          ? {
+              create: requirementIds.map((requirementId) => ({
+                requirementId,
+              })),
+            }
+          : undefined,
+    },
+    include: {
+      requirements: {
+        include: { requirement: true },
+        orderBy: { requirement: { sortOrder: "asc" } },
+      },
+    },
   })
 
-  return NextResponse.json(product, { status: 201 })
+  return NextResponse.json(
+    {
+      ...product,
+      requirements: product.requirements.map((r) => ({
+        id: r.requirement.id,
+        name: r.requirement.name,
+        sortOrder: r.requirement.sortOrder,
+      })),
+    },
+    { status: 201 }
+  )
 }
 

@@ -10,10 +10,8 @@ async function main() {
     { role: "COLLECTOR", email: "collector@mcfmp.com", password: "collector123", name: "Collector" },
     { role: "CREDIT_COMMITTEE", email: "committee@mcfmp.com", password: "committee123", name: "Credit Committee" },
     { role: "BOARD_OF_DIRECTORS", email: "board@mcfmp.com", password: "board123", name: "Board of Directors" },
-    { role: "TREASURER", email: "treasurer@mcfmp.com", password: "treasurer123", name: "Treasurer" },
-    { role: "LOANS_CLERK", email: "loansclerk@mcfmp.com", password: "loansclerk123", name: "Loans Clerk" },
-    { role: "DISBURSING_STAFF", email: "disbursing@mcfmp.com", password: "disbursing123", name: "Disbursing Staff" },
-    { role: "CASHIER", email: "cashier@mcfmp.com", password: "cashier123", name: "Cashier" },
+    // Finance Officer is represented by the TREASURER role
+    { role: "TREASURER", email: "finance@mcfmp.com", password: "finance123", name: "Finance Officer" },
     { role: "MEMBER", email: "member@mcfmp.com", password: "member123", name: "Juan Dela Cruz" },
   ]
 

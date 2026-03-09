@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, type Resolver } from "react-hook-form"
@@ -66,15 +66,43 @@ const schema = z
 
 type FormData = z.infer<typeof schema>
 
+type RequirementOption = { id: string; name: string; sortOrder: number }
+
 export function LoanTypeForm({
   id,
   defaultValues,
+  requirements = [],
+  defaultRequirementIds = [],
 }: {
   id?: string
   defaultValues?: Partial<FormData>
+  requirements?: RequirementOption[]
+  defaultRequirementIds?: string[]
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>(defaultRequirementIds)
+
+  useEffect(() => {
+    setSelectedRequirementIds((prev) => {
+      if (
+        prev.length === defaultRequirementIds.length &&
+        prev.every((id) => defaultRequirementIds.includes(id))
+      ) {
+        return prev
+      }
+      return defaultRequirementIds
+    })
+  }, [defaultRequirementIds])
+
+  function toggleRequirement(requirementId: string) {
+    setSelectedRequirementIds((prev) =>
+      prev.includes(requirementId)
+        ? prev.filter((r) => r !== requirementId)
+        : [...prev, requirementId]
+    )
+  }
+
   const {
     register,
     handleSubmit,
@@ -109,6 +137,7 @@ export function LoanTypeForm({
       maxAmountFixed: Number.isNaN(data.maxAmountFixed)
         ? undefined
         : data.maxAmountFixed,
+      requirementIds: selectedRequirementIds,
     }
 
     const res = await fetch(
@@ -222,7 +251,7 @@ export function LoanTypeForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="maxCbuPercent">
-              Max % of CBU (e.g. 80 for 80%)
+              CBU requirement % of loan (e.g. 10 for 10%)
             </FieldLabel>
             <Input
               id="maxCbuPercent"
@@ -323,6 +352,30 @@ export function LoanTypeForm({
             </p>
           )}
         </Field>
+        {requirements.length > 0 && (
+          <Field>
+            <FieldLabel>Requirements for this loan type</FieldLabel>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Only checked requirements will appear when members apply for this loan type.
+            </p>
+            <div className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3">
+              {requirements.map((r) => (
+                <label
+                  key={r.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedRequirementIds.includes(r.id)}
+                    onChange={() => toggleRequirement(r.id)}
+                    className="size-4 rounded border-input"
+                  />
+                  <span>{r.name}</span>
+                </label>
+              ))}
+            </div>
+          </Field>
+        )}
       </FieldGroup>
       <div className="flex gap-2">
         <Button type="submit" disabled={isSubmitting}>

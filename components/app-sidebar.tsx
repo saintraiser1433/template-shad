@@ -5,10 +5,13 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard,
   Users,
+  UserCircle,
   Wallet,
   Banknote,
   FileText,
   Scale,
+  FileCheck,
+  ScrollText,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -23,17 +26,66 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const staffNavMain = [
+const memberNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
+    title: "Loans",
+    url: "/loans",
+    icon: Wallet,
+    items: [
+      { title: "Apply for Loan", url: "/loans/apply" },
+      { title: "My Loans", url: "/loans" },
+    ],
   },
+]
+
+const collectorNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   {
-    title: "Members",
-    url: "/members",
-    icon: Users,
+    title: "Loans",
+    url: "/loans/pending",
+    icon: Wallet,
+    items: [{ title: "Pending CI/BI", url: "/loans/pending" }],
   },
+]
+
+const managerNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  {
+    title: "Loans",
+    url: "/loans/for-approval",
+    icon: Wallet,
+    items: [{ title: "For Approval", url: "/loans/for-approval" }],
+  },
+  { title: "Reports", url: "/reports", icon: FileText },
+]
+
+const committeeNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  {
+    title: "Loans",
+    url: "/loans/for-approval",
+    icon: Wallet,
+    items: [{ title: "For Approval", url: "/loans/for-approval" }],
+  },
+]
+
+const financeNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  {
+    title: "Loans",
+    url: "/loans/for-funding",
+    icon: Wallet,
+    items: [{ title: "For Funding", url: "/loans/for-funding" }],
+  },
+  { title: "Payments", url: "/payments", icon: Banknote },
+]
+
+const adminNavMain = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Users", url: "/users", icon: Users },
+  { title: "Members", url: "/members", icon: UserCircle },
+  { title: "Activity log", url: "/admin/activity-log", icon: ScrollText },
   {
     title: "Loans",
     url: "/loans",
@@ -46,39 +98,38 @@ const staffNavMain = [
       { title: "Type of Loans", url: "/loan-types" },
     ],
   },
-  {
-    title: "Payments",
-    url: "/payments",
-    icon: Banknote,
-  },
-  {
-    title: "Reports",
-    url: "/reports",
-    icon: FileText,
-  },
+  { title: "Requirements", url: "/requirements", icon: FileCheck },
+  { title: "Payments", url: "/payments", icon: Banknote },
+  { title: "Reports", url: "/reports", icon: FileText },
 ]
 
-const memberNavMain = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Loans",
-    url: "/loans",
-    icon: Wallet,
-    items: [
-      { title: "Apply for Loan", url: "/loans/apply" },
-      { title: "My Loans", url: "/loans" },
-    ],
-  },
-]
+function getNavForRole(role: string | undefined) {
+  switch (role) {
+    case "ADMIN":
+      return adminNavMain
+    case "MANAGER":
+      return managerNavMain
+    case "COLLECTOR":
+      return collectorNavMain
+    case "CREDIT_COMMITTEE":
+    case "BOARD_OF_DIRECTORS":
+      return committeeNavMain
+    case "TREASURER":
+    case "LOANS_CLERK":
+    case "DISBURSING_STAFF":
+    case "CASHIER":
+      return financeNavMain
+    case "MEMBER":
+      return memberNavMain
+    default:
+      return adminNavMain
+  }
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
   const role = session?.user?.role
-  const navMain = role === "MEMBER" ? memberNavMain : staffNavMain
+  const navMain = getNavForRole(role)
 
   return (
     <Sidebar variant="inset" {...props}>

@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { Eye } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { ModuleHeader } from "@/components/module-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
+import { ReportExportForm } from "./report-export-form"
 
 export default async function ReportsPage({
   searchParams,
@@ -99,13 +100,8 @@ export default async function ReportsPage({
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -117,15 +113,28 @@ export default async function ReportsPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <div className="space-y-1">
           <h1 className="text-base font-semibold">Reports</h1>
           <p className="text-sm text-muted-foreground">
             Portfolio overview: outstanding balances, collections, delinquency, and member CBU.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Generate report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Export loans, collections, or members list as Excel or PDF.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ReportExportForm />
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
@@ -182,18 +191,20 @@ export default async function ReportsPage({
         </div>
 
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
               <CardTitle>Outstanding loans</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Active and delinquent loans with current outstanding balance.
               </p>
             </div>
-            <TableSearchForm
-              basePath="/reports"
-              defaultSearch={search}
-              placeholder="Search loan no or member..."
-            />
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/reports"
+                defaultSearch={search}
+                placeholder="Search loan no or member..."
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -234,8 +245,10 @@ export default async function ReportsPage({
                           ₱{loan.outstandingBalance.toLocaleString("en-PH")}
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/loans/${loan.id}`}>View</Link>
+                          <Button variant="action" size="icon-sm" asChild title="View">
+                            <Link href={`/loans/${loan.id}`}>
+                              <Eye className="size-4" />
+                            </Link>
                           </Button>
                         </td>
                       </tr>
@@ -251,18 +264,20 @@ export default async function ReportsPage({
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
               <CardTitle>Delinquent accounts</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Loans past due; require follow-up and collection.
               </p>
             </div>
-            <TableSearchForm
-              basePath="/reports"
-              defaultSearch={search}
-              placeholder="Search loan no or member..."
-            />
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/reports"
+                defaultSearch={search}
+                placeholder="Search loan no or member..."
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -300,8 +315,10 @@ export default async function ReportsPage({
                           ₱{loan.outstandingBalance.toLocaleString("en-PH")}
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/loans/${loan.id}`}>View</Link>
+                          <Button variant="action" size="icon-sm" asChild title="View">
+                            <Link href={`/loans/${loan.id}`}>
+                              <Eye className="size-4" />
+                            </Link>
                           </Button>
                         </td>
                       </tr>

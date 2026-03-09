@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { ClipboardEdit } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
+import { ModuleHeader } from "@/components/module-header"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
@@ -20,6 +20,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { UpdateApplicationStatus } from "@/components/update-application-status"
+import { CibiSheet } from "./cibi-sheet"
 
 export default async function LoansPendingPage({
   searchParams,
@@ -28,6 +29,9 @@ export default async function LoansPendingPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  const role = session.user.role
+  const allowedRoles = ["ADMIN", "MANAGER", "COLLECTOR"]
+  if (!role || !allowedRoles.includes(role)) redirect("/dashboard")
 
   const { search } = await searchParams
   const q = search?.trim()
@@ -46,18 +50,15 @@ export default async function LoansPendingPage({
         : {}),
     },
     orderBy: { createdAt: "desc" },
-    include: { member: true },
+    include: {
+      member: true,
+    },
   })
 
   return (
     <DashboardLayout>
-      <header className="flex h-16 shrink-0 items-center gap-2">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
+      <ModuleHeader
+        breadcrumb={
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -73,22 +74,24 @@ export default async function LoansPendingPage({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </div>
-      </header>
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        }
+      />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
         <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardHeader className="flex flex-col gap-4">
             <div>
-              <CardTitle>Pending applications (CI/BI queue)</CardTitle>
+              <h2 className="text-base font-semibold">Pending applications (CI/BI queue)</h2>
               <p className="text-sm text-muted-foreground">
                 Manager and Collector conduct CI/BI using 5C&apos;s of credit.
               </p>
             </div>
-            <TableSearchForm
-              basePath="/loans/pending"
-              defaultSearch={search}
-              placeholder="Search application no or member..."
-            />
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/loans/pending"
+                defaultSearch={search}
+                placeholder="Search application no or member..."
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -141,10 +144,28 @@ export default async function LoansPendingPage({
                           <Badge variant="secondary">{app.status}</Badge>
                         </td>
                         <td className="px-3 py-1.5 text-right">
-                          <UpdateApplicationStatus
-                            applicationId={app.id}
-                            currentStatus={app.status}
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <CibiSheet
+                              applicationId={app.id}
+                              applicationNo={app.applicationNo}
+                              memberName={app.member.name}
+                              memberNo={app.member.memberNo}
+                              currentStatus={app.status}
+                              defaultValues={{
+                                characterNotes: app.characterNotes ?? "",
+                                capacityNotes: app.capacityNotes ?? "",
+                                capitalNotes: app.capitalNotes ?? "",
+                                collateralNotes: app.collateralNotes ?? "",
+                                conditionsNotes: app.conditionsNotes ?? "",
+                                cibiPassed: app.cibiPassed ?? false,
+                              }}
+                            />
+                            <UpdateApplicationStatus
+                              applicationId={app.id}
+                              currentStatus={app.status}
+                              role={role}
+                            />
+                          </div>
                         </td>
                       </tr>
                     ))

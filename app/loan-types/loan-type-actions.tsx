@@ -37,21 +37,22 @@ export function LoanTypeActions({ id }: { id: string }) {
   return (
     <div className="flex justify-end gap-1.5">
       <Button
-        variant="ghost"
-        size="icon-xs"
+        variant="action"
+        size="icon-sm"
         onClick={() => router.push(`/loan-types/${id}`)}
         aria-label="Edit loan type"
       >
-        <Pencil className="size-3.5" />
+        <Pencil className="size-4" />
       </Button>
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button
-            variant="ghost"
-            size="icon-xs"
+            variant="action"
+            size="icon-sm"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
             aria-label="Delete loan type"
           >
-            <Trash2 className="size-3.5 text-destructive" />
+            <Trash2 className="size-4" />
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent size="sm">

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "npx tsx prisma/seed.ts",
+    "delete-all-loans": "npx tsx scripts/delete-all-loans.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "postinstall": "prisma generate"
@@ -23,6 +24,8 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.570.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
@@ -33,6 +36,7 @@
     "react-hook-form": "^7.71.2",
     "sonner": "^1.5.0",
     "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
