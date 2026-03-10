@@ -46,7 +46,8 @@ export default async function LoanDetailPage({
           loanProduct: true,
           cibiApprovedBy: { select: { name: true } },
           managerApprovedBy: { select: { name: true } },
-          committeeBoardApprovedBy: { select: { name: true } },
+          committeeApprovedBy: { select: { name: true } },
+          boardApprovedBy: { select: { name: true } },
           fundedBy: { select: { name: true } },
         },
       },
@@ -379,10 +380,18 @@ export default async function LoanDetailPage({
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Credit Committee / Board who approved
+                      Committee who approved
                     </p>
                     <p className="font-medium">
-                      {loan.application.committeeBoardApprovedBy?.name ?? "—"}
+                      {loan.application.committeeApprovedBy?.name ?? "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Board who approved
+                    </p>
+                    <p className="font-medium">
+                      {loan.application.boardApprovedBy?.name ?? "—"}
                     </p>
                   </div>
                   <div>

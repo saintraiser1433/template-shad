@@ -23,7 +23,8 @@ type MemberApplicationRow = {
   rejectionReason: string | null
   cibiApprovedByName?: string | null
   managerApprovedByName?: string | null
-  committeeBoardApprovedByName?: string | null
+  committeeApprovedByName?: string | null
+  boardApprovedByName?: string | null
   fundedByName?: string | null
 }
 
@@ -43,7 +44,8 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
               <th className="px-3 py-1.5 text-left font-medium">Status</th>
               <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
               <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
-              <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Committee who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Board who approved</th>
               <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
               <th className="px-3 py-1.5 text-right font-medium">Actions</th>
             </tr>
@@ -82,7 +84,8 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
                   </td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.cibiApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.managerApprovedByName ?? "—"}</td>
-                  <td className="px-3 py-1.5 text-muted-foreground">{app.committeeBoardApprovedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.committeeApprovedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.boardApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.fundedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-right">
                     {app.status === "REJECTED" && app.rejectionReason ? (

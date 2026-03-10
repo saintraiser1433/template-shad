@@ -58,7 +58,8 @@ export default async function LoansForApprovalPage({
       member: true,
       cibiApprovedBy: { select: { name: true } },
       managerApprovedBy: { select: { name: true } },
-      committeeBoardApprovedBy: { select: { name: true } },
+      committeeApprovedBy: { select: { name: true } },
+      boardApprovedBy: { select: { name: true } },
       fundedBy: { select: { name: true } },
     },
   })
@@ -115,7 +116,8 @@ export default async function LoansForApprovalPage({
                     <th className="px-3 py-1.5 text-left font-medium">Status</th>
                     <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
-                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Board who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
@@ -164,7 +166,10 @@ export default async function LoansForApprovalPage({
                           {app.managerApprovedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-muted-foreground">
-                          {app.committeeBoardApprovedBy?.name ?? "—"}
+                          {app.committeeApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.boardApprovedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-muted-foreground">
                           {app.fundedBy?.name ?? "—"}

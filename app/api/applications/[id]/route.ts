@@ -70,7 +70,8 @@ export async function PATCH(
     approvalRemarks?: string | null
     cibiApprovedById?: string | null
     managerApprovedById?: string | null
-    committeeBoardApprovedById?: string | null
+    committeeApprovedById?: string | null
+    boardApprovedById?: string | null
   } = {}
 
   if (body.characterNotes !== undefined) updateData.characterNotes = body.characterNotes || null
@@ -108,11 +109,13 @@ export async function PATCH(
     if (newStatus === "COMMITTEE_REVIEW" && application.status === "MANAGER_REVIEW") {
       updateData.managerApprovedById = userId
     }
-    if (newStatus === "APPROVED" && (application.status === "COMMITTEE_REVIEW" || application.status === "BOARD_REVIEW")) {
-      updateData.committeeBoardApprovedById = userId
-    }
+    // When committee endorses to board, record committee approver
     if (newStatus === "BOARD_REVIEW" && application.status === "COMMITTEE_REVIEW") {
-      // Manager endorsed to committee; committee/board approver set when they approve
+      updateData.committeeApprovedById = userId
+    }
+    // When board finally approves, record board approver
+    if (newStatus === "APPROVED" && application.status === "BOARD_REVIEW") {
+      updateData.boardApprovedById = userId
     }
   }
 

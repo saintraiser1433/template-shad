@@ -90,10 +90,11 @@ model User {
   member              Member?
   paymentsCollected   Payment[] @relation("CollectedBy")
   applicationsAssigned LoanApplication[] @relation("CollectorAssigned")
-  applicationsCibiApproved LoanApplication[] @relation("CibiApprovedBy")
-  applicationsManagerApproved LoanApplication[] @relation("ManagerApprovedBy")
-  applicationsCommitteeBoardApproved LoanApplication[] @relation("CommitteeBoardApprovedBy")
-  applicationsFunded LoanApplication[] @relation("FundedBy")
+  applicationsCibiApproved      LoanApplication[] @relation("CibiApprovedBy")
+  applicationsManagerApproved   LoanApplication[] @relation("ManagerApprovedBy")
+  applicationsCommitteeApproved LoanApplication[] @relation("CommitteeApprovedBy")
+  applicationsBoardApproved     LoanApplication[] @relation("BoardApprovedBy")
+  applicationsFunded            LoanApplication[] @relation("FundedBy")
   documentsUploaded   Document[] @relation("UploadedBy")
   notifications       Notification[]
   activityLogs       ActivityLog[]
@@ -180,18 +181,20 @@ model LoanApplication {
   memberId        String            @map("member_id")
   loanProductId   String?           @map("loan_product_id")
   collectorId     String?           @map("collector_id")
-  cibiApprovedById     String?      @map("cibi_approved_by_id")
-  managerApprovedById  String?      @map("manager_approved_by_id")
-  committeeBoardApprovedById String? @map("committee_board_approved_by_id")
-  fundedById         String?       @map("funded_by_id")
+  cibiApprovedById       String? @map("cibi_approved_by_id")
+  managerApprovedById    String? @map("manager_approved_by_id")
+  committeeApprovedById  String? @map("committee_approved_by_id")
+  boardApprovedById      String? @map("board_approved_by_id")
+  fundedById             String? @map("funded_by_id")
 
   member       Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   loanProduct  LoanProduct? @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
-  collector    User?       @relation("CollectorAssigned", fields: [collectorId], references: [id], onDelete: SetNull)
-  cibiApprovedBy    User?   @relation("CibiApprovedBy", fields: [cibiApprovedById], references: [id], onDelete: SetNull)
-  managerApprovedBy User?   @relation("ManagerApprovedBy", fields: [managerApprovedById], references: [id], onDelete: SetNull)
-  committeeBoardApprovedBy User? @relation("CommitteeBoardApprovedBy", fields: [committeeBoardApprovedById], references: [id], onDelete: SetNull)
-  fundedBy     User?       @relation("FundedBy", fields: [fundedById], references: [id], onDelete: SetNull)
+  collector          User? @relation("CollectorAssigned", fields: [collectorId], references: [id], onDelete: SetNull)
+  cibiApprovedBy     User? @relation("CibiApprovedBy", fields: [cibiApprovedById], references: [id], onDelete: SetNull)
+  managerApprovedBy  User? @relation("ManagerApprovedBy", fields: [managerApprovedById], references: [id], onDelete: SetNull)
+  committeeApprovedBy User? @relation("CommitteeApprovedBy", fields: [committeeApprovedById], references: [id], onDelete: SetNull)
+  boardApprovedBy     User? @relation("BoardApprovedBy", fields: [boardApprovedById], references: [id], onDelete: SetNull)
+  fundedBy            User? @relation("FundedBy", fields: [fundedById], references: [id], onDelete: SetNull)
   loan         Loan?
   documents    Document[]
 }

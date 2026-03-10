@@ -87,14 +87,48 @@ export function ApprovalApplicationActions({
   }
 
   function getApproveStatus(): ApplicationStatus {
-    if (currentUserRole === "MANAGER" && application.amount > MANAGER_APPROVAL_LIMIT) {
-      return "COMMITTEE_REVIEW"
+    const currentStatus = application.status as ApplicationStatus
+
+    // Manager or Admin acting at manager stage
+    if (currentStatus === "MANAGER_REVIEW") {
+      if (currentUserRole === "MANAGER" || currentUserRole === "ADMIN") {
+        if (application.amount > MANAGER_APPROVAL_LIMIT) {
+          // High amount: endorse to Credit Committee
+          return "COMMITTEE_REVIEW"
+        }
+        // Within manager limit: fully approve
+        return "APPROVED"
+      }
     }
+
+    // Credit Committee (or Admin) acting at committee stage: endorse to Board
+    if (currentStatus === "COMMITTEE_REVIEW") {
+      if (currentUserRole === "CREDIT_COMMITTEE" || currentUserRole === "ADMIN") {
+        return "BOARD_REVIEW"
+      }
+    }
+
+    // Board (or Admin) acting at board stage: final approval
+    if (currentStatus === "BOARD_REVIEW") {
+      if (currentUserRole === "BOARD_OF_DIRECTORS" || currentUserRole === "ADMIN") {
+        return "APPROVED"
+      }
+    }
+
+    // Fallback: try to approve directly
     return "APPROVED"
   }
 
   const approveStatus = getApproveStatus()
   const isCommitteeOrBoard = currentUserRole === "CREDIT_COMMITTEE" || currentUserRole === "BOARD_OF_DIRECTORS"
+  const approveButtonLabel =
+    approveStatus === "APPROVED"
+      ? "Approve"
+      : approveStatus === "COMMITTEE_REVIEW"
+        ? "Endorse to Committee"
+        : approveStatus === "BOARD_REVIEW"
+          ? "Endorse to Board"
+          : "Update status"
 
   // Load CI/BI documents (photos, investigation) when the CI/BI dialog is first opened.
   useEffect(() => {
@@ -269,7 +303,7 @@ export function ApprovalApplicationActions({
                 onClick={handleApproveClick}
                 disabled={loading}
               >
-                {approveStatus === "APPROVED" ? "Approve" : "Endorse to Committee"}
+                {approveButtonLabel}
               </AlertDialogAction>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
