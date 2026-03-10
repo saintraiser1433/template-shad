@@ -58,6 +58,17 @@ export default async function LoansPage({
     orderBy: { createdAt: "desc" },
     include: {
       member: { select: { id: true, memberNo: true, name: true } },
+      application: {
+        select: {
+          cibiApprovedBy: { select: { name: true } },
+          managerApprovedBy: { select: { name: true } },
+          committeeBoardApprovedBy: { select: { name: true } },
+          fundedBy: { select: { name: true } },
+        },
+      },
+      amortizationSchedule: {
+        select: { isPaid: true },
+      },
     },
   })
 
@@ -67,6 +78,10 @@ export default async function LoansPage({
         orderBy: { createdAt: "desc" },
         include: {
           loanProduct: { select: { name: true } },
+          cibiApprovedBy: { select: { name: true } },
+          managerApprovedBy: { select: { name: true } },
+          committeeBoardApprovedBy: { select: { name: true } },
+          fundedBy: { select: { name: true } },
         },
       })
     : []
@@ -116,6 +131,10 @@ export default async function LoansPage({
                       Outstanding
                     </th>
                     <th className="px-3 py-1.5 text-left font-medium">Status</th>
+                    <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">
                       Actions
                     </th>
@@ -125,53 +144,72 @@ export default async function LoansPage({
                   {loans.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={11}
                         className="px-3 py-10"
                       >
                         <EmptyState title={q ? "No loans found" : "No loans yet"} />
                       </td>
                     </tr>
                   ) : (
-                    loans.map((loan) => (
-                      <tr
-                        key={loan.id}
-                        className="border-b transition-colors hover:bg-muted/30"
-                      >
-                        <td className="px-3 py-1.5 font-medium">{loan.loanNo}</td>
-                        <td className="px-3 py-1.5">
-                          {loan.member.name} ({loan.member.memberNo})
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {loan.loanType.replace(/_/g, " ")}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          ₱{loan.principalAmount.toLocaleString("en-PH")}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          ₱{loan.outstandingBalance.toLocaleString("en-PH")}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <Badge
-                            variant={
-                              loan.status === "ACTIVE"
-                                ? "default"
-                                : loan.status === "DELINQUENT"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {loan.status}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-1.5 text-right">
-                          <Button variant="action" size="icon-sm" asChild title="View">
-                            <Link href={`/loans/${loan.id}`}>
-                              <Eye className="size-4" />
-                            </Link>
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
+                    loans.map((loan) => {
+                      const isLoanFullyPaid =
+                        loan.outstandingBalance <= 0 &&
+                        loan.amortizationSchedule.every((row) => row.isPaid)
+                      const displayStatus =
+                        isLoanFullyPaid && loan.status !== "PAID" ? "PAID" : loan.status
+                      return (
+                        <tr
+                          key={loan.id}
+                          className="border-b transition-colors hover:bg-muted/30"
+                        >
+                          <td className="px-3 py-1.5 font-medium">{loan.loanNo}</td>
+                          <td className="px-3 py-1.5">
+                            {loan.member.name} ({loan.member.memberNo})
+                          </td>
+                          <td className="px-3 py-1.5">
+                            {loan.loanType.replace(/_/g, " ")}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            ₱{loan.principalAmount.toLocaleString("en-PH")}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            ₱{loan.outstandingBalance.toLocaleString("en-PH")}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <Badge
+                              variant={
+                                displayStatus === "ACTIVE"
+                                  ? "default"
+                                  : displayStatus === "DELINQUENT"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                            >
+                              {displayStatus}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {loan.application?.cibiApprovedBy?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {loan.application?.managerApprovedBy?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {loan.application?.committeeBoardApprovedBy?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {loan.application?.fundedBy?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            <Button variant="action" size="icon-sm" asChild title="View">
+                              <Link href={`/loans/${loan.id}`}>
+                                <Eye className="size-4" />
+                              </Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -201,6 +239,10 @@ export default async function LoansPage({
                   amount: app.amount,
                   status: app.status,
                   rejectionReason: app.rejectionReason ?? null,
+                  cibiApprovedByName: app.cibiApprovedBy?.name ?? null,
+                  managerApprovedByName: app.managerApprovedBy?.name ?? null,
+                  committeeBoardApprovedByName: app.committeeBoardApprovedBy?.name ?? null,
+                  fundedByName: app.fundedBy?.name ?? null,
                 }))}
               />
             </CardContent>

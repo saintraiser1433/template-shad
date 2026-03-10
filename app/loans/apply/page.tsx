@@ -11,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { AlertTriangle } from "lucide-react"
 import { LoanApplicationForm } from "./loan-application-form"
 
 export default async function LoanApplyPage({
@@ -55,6 +56,25 @@ export default async function LoanApplyPage({
     redirect("/dashboard?error=member_not_linked")
   }
 
+  // For member role, check if there is an existing loan that is not yet fully paid.
+  const existingLoan =
+    isMemberRole && currentMemberId
+      ? await prisma.loan.findFirst({
+          where: {
+            memberId: currentMemberId,
+            status: {
+              in: ["ACTIVE", "DELINQUENT", "RENEWED"],
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            loanNo: true,
+            outstandingBalance: true,
+            status: true,
+          },
+        })
+      : null
+
   const loanProductsWithReqs = loanProducts.map((p) => ({
     ...p,
     requirements: p.requirements.map((r) => ({
@@ -84,19 +104,41 @@ export default async function LoanApplyPage({
           </Breadcrumb>
         }
       />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
-        <LoanApplicationForm
-          members={members.map((m) => ({
-            id: m.id,
-            memberNo: m.memberNo,
-            name: m.name,
-            cbu: m.cbu,
-          }))}
-          loanProducts={loanProductsWithReqs}
-          defaultMemberId={currentMemberId ?? memberId ?? undefined}
-          currentMemberId={currentMemberId}
-        />
-      </div>
+      {isMemberRole && existingLoan ? (
+        <div className="flex flex-1 items-center justify-center p-4 pt-6">
+          <div className="w-full max-w-2xl text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Outstanding loan in progress
+                </h2>
+                <p className="mt-2 text-base text-muted-foreground">
+                  You currently have loan {existingLoan.loanNo} with an outstanding balance of{" "}
+                  ₱{existingLoan.outstandingBalance.toLocaleString("en-PH")}. You need to fully pay
+                  this loan before applying for a new one.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+          <LoanApplicationForm
+            members={members.map((m) => ({
+              id: m.id,
+              memberNo: m.memberNo,
+              name: m.name,
+              cbu: m.cbu,
+            }))}
+            loanProducts={loanProductsWithReqs}
+            defaultMemberId={currentMemberId ?? memberId ?? undefined}
+            currentMemberId={currentMemberId}
+          />
+        </div>
+      )}
     </DashboardLayout>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, type Resolver } from "react-hook-form"
@@ -82,18 +82,14 @@ export function LoanTypeForm({
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>(defaultRequirementIds)
+  const prevIdRef = useRef(id)
 
   useEffect(() => {
-    setSelectedRequirementIds((prev) => {
-      if (
-        prev.length === defaultRequirementIds.length &&
-        prev.every((id) => defaultRequirementIds.includes(id))
-      ) {
-        return prev
-      }
-      return defaultRequirementIds
-    })
-  }, [defaultRequirementIds])
+    if (prevIdRef.current !== id) {
+      prevIdRef.current = id
+      setSelectedRequirementIds(defaultRequirementIds)
+    }
+  }, [id, defaultRequirementIds])
 
   function toggleRequirement(requirementId: string) {
     setSelectedRequirementIds((prev) =>

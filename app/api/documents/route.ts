@@ -17,14 +17,15 @@ export async function GET(req: NextRequest) {
   }
   const { searchParams } = new URL(req.url)
   const applicationId = searchParams.get("applicationId")
-  if (!applicationId) {
+  const paymentId = searchParams.get("paymentId")
+  if (!applicationId && !paymentId) {
     return NextResponse.json(
-      { error: "applicationId is required" },
+      { error: "applicationId or paymentId is required" },
       { status: 400 }
     )
   }
   const documents = await prisma.document.findMany({
-    where: { applicationId },
+    where: applicationId ? { applicationId } : { paymentId: paymentId ?? undefined },
     orderBy: { createdAt: "desc" },
   })
   return NextResponse.json(documents)
@@ -40,9 +41,8 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null
     const applicationId = formData.get("applicationId") as string | null
     const category = (formData.get("category") as string) || "REQUIREMENT"
-    // requirementId exists in the DB schema, but the current generated Prisma client
-    // (in your environment) does not know about it yet, so we must NOT send it here.
-    // const requirementId = (formData.get("requirementId") as string) || null
+    const paymentId = (formData.get("paymentId") as string) || null
+    const requirementId = (formData.get("requirementId") as string) || null
 
     if (!file || file.size === 0) {
       return NextResponse.json(
@@ -58,10 +58,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    const allowedCategories = ["REQUIREMENT", "PHOTO", "INVESTIGATION"]
+    const allowedCategories = ["REQUIREMENT", "PHOTO", "INVESTIGATION", "PAYMENT_RECEIPT"]
     if (!allowedCategories.includes(category)) {
       return NextResponse.json(
         { error: "Invalid category" },
+        { status: 400 }
+      )
+    }
+
+    if (category === "PAYMENT_RECEIPT" && applicationId) {
+      return NextResponse.json(
+        { error: "Payment receipts must not be uploaded under an applicationId" },
         { status: 400 }
       )
     }
@@ -82,10 +89,16 @@ export async function POST(req: NextRequest) {
         fileSize: file.size,
         mimeType: file.type || null,
         category,
+        paymentId: paymentId || undefined,
         // Use application relation (present in existing client)
         application: applicationId
           ? {
               connect: { id: applicationId },
+            }
+          : undefined,
+        requirement: requirementId
+          ? {
+              connect: { id: requirementId },
             }
           : undefined,
         uploadedBy: {

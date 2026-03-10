@@ -7,6 +7,10 @@ const createPaymentSchema = z.object({
   amount: z.number().positive(),
   paymentDate: z.coerce.date(),
   remarks: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  receiptDocumentId: z.string().optional(),
+   scheduleId: z.string().optional(),
+  referenceNo: z.string().max(100).optional(),
 })
 
 export async function GET(
@@ -42,15 +46,31 @@ export async function POST(
       { status: 400 }
     )
   }
-  const { amount, remarks } = parsed.data
+  const {
+    amount,
+    remarks,
+    paymentMethod,
+    receiptDocumentId,
+    scheduleId,
+    referenceNo,
+  } = parsed.data
   const paymentDate =
     typeof parsed.data.paymentDate === "string"
       ? new Date(parsed.data.paymentDate)
       : parsed.data.paymentDate
+  const isCash = !paymentMethod || paymentMethod.toUpperCase() === "CASH"
+  const isMember = session.user.role === "MEMBER"
+  const createPendingOnly = isMember && !isCash
 
   const loan = await prisma.loan.findUnique({
     where: { id },
-    include: { amortizationSchedule: { orderBy: { sequence: "asc" } } },
+    include: {
+      member: { select: { userId: true } },
+      application: {
+        include: { loanProduct: true },
+      },
+      amortizationSchedule: { orderBy: { sequence: "asc" } },
+    },
   })
   if (!loan) {
     return NextResponse.json({ error: "Loan not found" }, { status: 404 })
@@ -62,49 +82,150 @@ export async function POST(
     )
   }
 
+  // Members may only record payments for their own loan
+  if (session.user.role === "MEMBER") {
+    if (
+      loan.member.userId == null ||
+      loan.member.userId !== session.user.id
+    ) {
+      return NextResponse.json(
+        { error: "You can only record payments for your own loan" },
+        { status: 403 }
+      )
+    }
+  }
+
+  // Member online (non-CASH): create pending payment only; no schedule/balance update
+  if (createPendingOnly) {
+    if (!referenceNo || referenceNo.trim() === "") {
+      return NextResponse.json(
+        { error: "Reference number is required for online payments." },
+        { status: 400 },
+      )
+    }
+    const payment = await prisma.payment.create({
+      data: {
+        loanId: id,
+        amount,
+        principal: 0,
+        interest: 0,
+        penalty: 0,
+        paymentDate,
+        paymentMethod: paymentMethod ?? undefined,
+        status: "PENDING_APPROVAL",
+        remarks,
+        referenceNo: referenceNo || null,
+        collectedById: session.user.id,
+        amortizationScheduleId: scheduleId ?? undefined,
+      },
+    })
+    if (receiptDocumentId) {
+      const receipt = await prisma.document.findUnique({
+        where: { id: receiptDocumentId },
+        select: { id: true, uploadedById: true, category: true, paymentId: true },
+      })
+      if (
+        receipt &&
+        receipt.uploadedById === session.user.id &&
+        receipt.category === "PAYMENT_RECEIPT" &&
+        !receipt.paymentId
+      ) {
+        await prisma.document.update({
+          where: { id: receiptDocumentId },
+          data: { paymentId: payment.id },
+        })
+      }
+    }
+    return NextResponse.json(payment)
+  }
+
   let remaining = amount
   let principalApplied = 0
   let interestApplied = 0
   let penaltyApplied = 0
   const schedule = loan.amortizationSchedule
+  const targetScheduleId = scheduleId ?? null
+  const maxCbuPercent =
+    loan.application?.loanProduct?.maxCbuPercent != null
+      ? loan.application.loanProduct.maxCbuPercent
+      : null
+  const totalCbuRequired =
+    maxCbuPercent != null ? loan.principalAmount * (maxCbuPercent / 100) : 0
+  const cbuPerScheduleRow =
+    totalCbuRequired > 0 && schedule.length > 0
+      ? totalCbuRequired / schedule.length
+      : 0
+
+  let cbuToCredit = 0
 
   for (const row of schedule) {
+    if (targetScheduleId && row.id !== targetScheduleId) continue
     if (row.isPaid || remaining <= 0) continue
     const totalDue = row.totalDue + row.penalty
-    const pay = Math.min(remaining, totalDue)
+    const alreadyPaid = row.paidAmount ?? 0
+    const stillOwed = Math.max(0, totalDue - alreadyPaid)
+    const pay = Math.min(remaining, stillOwed)
     if (pay <= 0) continue
-    const penaltyPart = Math.min(pay, row.penalty)
-    const rest = pay - penaltyPart
-    const interestPart = Math.min(rest, row.interest)
-    const principalPart = rest - interestPart
+    // Infer what was already covered using the same priority: penalty -> interest -> principal
+    const alreadyPenalty = Math.min(alreadyPaid, row.penalty)
+    const alreadyInterest = Math.min(
+      Math.max(0, alreadyPaid - alreadyPenalty),
+      row.interest
+    )
+    const alreadyPrincipal = Math.max(0, alreadyPaid - alreadyPenalty - alreadyInterest)
+
+    const penaltyRemaining = Math.max(0, row.penalty - alreadyPenalty)
+    const interestRemaining = Math.max(0, row.interest - alreadyInterest)
+    const principalRemaining = Math.max(0, row.principal - alreadyPrincipal)
+
+    const penaltyPart = Math.min(pay, penaltyRemaining)
+    const restAfterPenalty = pay - penaltyPart
+    const interestPart = Math.min(restAfterPenalty, interestRemaining)
+    const restAfterInterest = restAfterPenalty - interestPart
+    const principalPart = Math.min(restAfterInterest, principalRemaining)
     penaltyApplied += penaltyPart
     interestApplied += interestPart
     principalApplied += principalPart
     remaining -= pay
-    const rowFullyPaid =
-      principalPart >= row.principal &&
-      interestPart >= row.interest &&
-      penaltyPart >= row.penalty
+    const rowFullyPaid = alreadyPaid + pay >= totalDue - 0.01
     await prisma.amortizationSchedule.update({
       where: { id: row.id },
       data: {
+        paidAmount: alreadyPaid + pay,
         isPaid: rowFullyPaid,
         paidAt: rowFullyPaid ? paymentDate : null,
       },
     })
+
+    // Only when this payment fully pays the schedule row (not partial),
+    // add the fixed CBU-per-period amount for this loan to the member's CBU.
+    if (rowFullyPaid && !row.isPaid && cbuPerScheduleRow > 0) {
+      cbuToCredit += cbuPerScheduleRow
+    }
   }
 
   const newOutstanding = Math.max(
     0,
     loan.outstandingBalance - principalApplied
   )
-  await prisma.loan.update({
-    where: { id },
-    data: {
-      outstandingBalance: newOutstanding,
-      status: newOutstanding <= 0 ? "PAID" : loan.status,
-    },
-  })
+  await prisma.$transaction([
+    prisma.loan.update({
+      where: { id },
+      data: {
+        outstandingBalance: newOutstanding,
+        status: newOutstanding <= 0 ? "PAID" : loan.status,
+      },
+    }),
+    // Every approved payment adds its principal portion to the member's CBU
+    prisma.member.update({
+      where: { id: loan.memberId },
+      data: {
+        cbu: {
+          increment: cbuToCredit,
+        },
+      },
+    }),
+  ])
 
   const payment = await prisma.payment.create({
     data: {
@@ -114,8 +235,12 @@ export async function POST(
       interest: interestApplied,
       penalty: penaltyApplied,
       paymentDate,
+      paymentMethod: isCash ? "CASH" : (paymentMethod ?? undefined),
+      status: "APPROVED",
       remarks,
+      referenceNo: referenceNo || null,
       collectedById: session.user.id,
+      amortizationScheduleId: scheduleId ?? undefined,
     },
   })
   return NextResponse.json(payment)

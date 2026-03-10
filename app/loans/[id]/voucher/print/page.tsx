@@ -9,6 +9,7 @@ export default async function LoanVoucherPrintPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  if (session.user.role !== "TREASURER") redirect("/dashboard")
 
   const { id: loanId } = await params
   const loan = await prisma.loan.findUnique({

@@ -21,6 +21,10 @@ type MemberApplicationRow = {
   amount: number
   status: string
   rejectionReason: string | null
+  cibiApprovedByName?: string | null
+  managerApprovedByName?: string | null
+  committeeBoardApprovedByName?: string | null
+  fundedByName?: string | null
 }
 
 export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[] }) {
@@ -37,6 +41,10 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
               <th className="px-3 py-1.5 text-left font-medium">Type</th>
               <th className="px-3 py-1.5 text-left font-medium">Amount</th>
               <th className="px-3 py-1.5 text-left font-medium">Status</th>
+              <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
               <th className="px-3 py-1.5 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -44,7 +52,7 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={9}
                   className="px-3 py-10"
                 >
                   <span className="text-xs text-muted-foreground">No loan applications yet.</span>
@@ -72,6 +80,10 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
                       {app.status.replace(/_/g, " ")}
                     </Badge>
                   </td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.cibiApprovedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.managerApprovedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.committeeBoardApprovedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{app.fundedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-right">
                     {app.status === "REJECTED" && app.rejectionReason ? (
                       <Button

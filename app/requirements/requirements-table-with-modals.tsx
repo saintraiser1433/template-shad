@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { ModuleHeader } from "@/components/module-header"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { TablePagination } from "@/components/ui/table-pagination"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,13 @@ export function RequirementsTableWithModals({
   const [editName, setEditName] = useState("")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const paginatedRequirements = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return requirements.slice(start, start + pageSize)
+  }, [requirements, page, pageSize])
 
   function getNextSortOrder() {
     if (requirements.length === 0) return 0
@@ -149,55 +157,69 @@ export function RequirementsTableWithModals({
             className="py-12"
           />
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-3 py-1.5 text-left font-medium">Name</th>
-                  <th className="px-3 py-1.5 text-left font-medium">Order</th>
-                  <th className="px-3 py-1.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requirements.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="border-b transition-colors hover:bg-muted/30"
-                  >
-                    <td className="px-3 py-1.5 font-medium">{r.name}</td>
-                    <td className="px-3 py-1.5 text-muted-foreground">
-                      {r.sortOrder}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="action"
-                          size="icon-sm"
-                          onClick={() => {
-                            setEditReq(r)
-                            setEditName(r.name)
-                            setEditOpen(true)
-                          }}
-                          title="Edit"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="action"
-                          size="icon-sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteReq(r)}
-                          title="Delete"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </td>
+          <>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-1.5 text-left font-medium">Name</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Order</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedRequirements.map((r) => (
+                    <tr
+                      key={r.id}
+                      className="border-b transition-colors hover:bg-muted/30"
+                    >
+                      <td className="px-3 py-1.5 font-medium">{r.name}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">
+                        {r.sortOrder}
+                      </td>
+                      <td className="px-3 py-1.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="action"
+                            size="icon-sm"
+                            onClick={() => {
+                              setEditReq(r)
+                              setEditName(r.name)
+                              setEditOpen(true)
+                            }}
+                            title="Edit"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="action"
+                            size="icon-sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteReq(r)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <TablePagination
+                totalItems={requirements.length}
+                page={page}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+              />
+            </div>
+          </>
         )}
       </CardContent>
       </Card>

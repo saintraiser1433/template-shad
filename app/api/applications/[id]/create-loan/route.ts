@@ -88,9 +88,10 @@ export async function POST(
     include: { amortizationSchedule: true },
   })
 
+  const userId = session.user.id
   await prisma.loanApplication.update({
     where: { id },
-    data: { status: "FUNDED" },
+    data: { status: "FUNDED", fundedById: userId },
   })
 
   return NextResponse.json(loan)

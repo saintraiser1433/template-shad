@@ -18,7 +18,9 @@ const NEXT_STATUS: Record<string, ApplicationStatus[]> = {
   MANAGER_REVIEW: ["APPROVED", "COMMITTEE_REVIEW", "REJECTED"],
   COMMITTEE_REVIEW: ["BOARD_REVIEW", "REJECTED"],
   BOARD_REVIEW: ["APPROVED", "REJECTED"],
-  APPROVED: ["FUNDED"],
+  // Once approved, funding is done via "Create loan" instead of a separate "Mark funded" step.
+  APPROVED: [],
+  // Keep RELEASED transition if you still want a final state after funding.
   FUNDED: ["RELEASED"],
 }
 

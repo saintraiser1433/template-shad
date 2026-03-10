@@ -12,6 +12,7 @@ import {
   Scale,
   FileCheck,
   ScrollText,
+  CreditCard,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -74,9 +75,12 @@ const financeNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   {
     title: "Loans",
-    url: "/loans/for-funding",
+    url: "/loans",
     icon: Wallet,
-    items: [{ title: "For Funding", url: "/loans/for-funding" }],
+    items: [
+      { title: "All Loans", url: "/loans" },
+      { title: "For Funding", url: "/loans/for-funding" },
+    ],
   },
   { title: "Payments", url: "/payments", icon: Banknote },
 ]
@@ -99,6 +103,7 @@ const adminNavMain = [
     ],
   },
   { title: "Requirements", url: "/requirements", icon: FileCheck },
+  { title: "Payment methods", url: "/payment-methods", icon: CreditCard },
   { title: "Payments", url: "/payments", icon: Banknote },
   { title: "Reports", url: "/reports", icon: FileText },
 ]

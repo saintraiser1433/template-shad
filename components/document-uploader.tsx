@@ -152,9 +152,7 @@ export function DocumentUploader({
 
   const filteredDocs = documents.filter((d) => {
     if (d.category !== category) return false
-    // Temporarily ignore requirementId when it's not persisted by the backend
-    // so that uploaded docs are still visible per requirement.
-    if (requirementId != null && d.requirementId != null) {
+    if (requirementId != null) {
       return d.requirementId === requirementId
     }
     return true

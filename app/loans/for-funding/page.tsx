@@ -47,7 +47,13 @@ export default async function LoansForFundingPage({
         : {}),
     },
     orderBy: { createdAt: "desc" },
-    include: { member: true },
+    include: {
+      member: true,
+      cibiApprovedBy: { select: { name: true } },
+      managerApprovedBy: { select: { name: true } },
+      committeeBoardApprovedBy: { select: { name: true } },
+      fundedBy: { select: { name: true } },
+    },
   })
 
   return (
@@ -100,6 +106,10 @@ export default async function LoansForFundingPage({
                     <th className="px-3 py-1.5 text-left font-medium">Member</th>
                     <th className="px-3 py-1.5 text-left font-medium">Type</th>
                     <th className="px-3 py-1.5 text-left font-medium">Amount</th>
+                    <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -107,7 +117,7 @@ export default async function LoansForFundingPage({
                   {applications.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={9}
                         className="px-3 py-10"
                       >
                         <EmptyState
@@ -136,6 +146,18 @@ export default async function LoansForFundingPage({
                         </td>
                         <td className="px-3 py-1.5">
                           ₱{app.amount.toLocaleString("en-PH")}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.cibiApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.managerApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.committeeBoardApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.fundedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-right flex gap-2 justify-end">
                           <CreateLoanFromApplication applicationId={app.id} />

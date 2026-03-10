@@ -90,6 +90,11 @@ export async function POST(req: NextRequest) {
       status: {
         in: ["ACTIVE", "DELINQUENT", "RENEWED"],
       },
+      // Treat loans with zero outstanding balance as effectively paid,
+      // even if their status was not updated in older records.
+      outstandingBalance: {
+        gt: 0,
+      },
     },
     select: { loanNo: true, status: true },
   })
@@ -103,13 +108,20 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Enforce one active/pending loan application per member
+  // Enforce one active/pending loan application per member.
+  // Applications that reached FUNDED/RELEASED are considered completed and do not block new ones.
   const existingApplication = await prisma.loanApplication.findFirst({
     where: {
       memberId,
-      // Allow only applications that were explicitly rejected; everything else blocks a new one
       status: {
-        not: "REJECTED",
+        in: [
+          "PENDING",
+          "CIBI_REVIEW",
+          "MANAGER_REVIEW",
+          "COMMITTEE_REVIEW",
+          "BOARD_REVIEW",
+          "APPROVED",
+        ],
       },
     },
     select: { applicationNo: true, status: true },
@@ -203,6 +215,27 @@ export async function POST(req: NextRequest) {
       status: "PENDING",
       loanProductId: loanProductId ?? undefined,
     },
+    include: {
+      member: { select: { name: true, memberNo: true } },
+    },
   })
+
+  // Notify all collectors that there is a new pending application for CI/BI
+  const collectors = await prisma.user.findMany({
+    where: { role: "COLLECTOR", status: "ACTIVE" },
+    select: { id: true },
+  })
+  const memberLabel = application.member.name || application.member.memberNo || "A member"
+  const message = `${memberLabel} submitted loan application ${application.applicationNo} (₱${amount.toLocaleString("en-PH")}). Pending CI/BI.`
+  await prisma.notification.createMany({
+    data: collectors.map((c) => ({
+      userId: c.id,
+      title: "New loan application for CI/BI",
+      message,
+      type: "PENDING_CIBI",
+      link: "/loans/pending",
+    })),
+  })
+
   return NextResponse.json(application)
 }

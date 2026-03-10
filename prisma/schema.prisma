@@ -90,6 +90,10 @@ model User {
   member              Member?
   paymentsCollected   Payment[] @relation("CollectedBy")
   applicationsAssigned LoanApplication[] @relation("CollectorAssigned")
+  applicationsCibiApproved LoanApplication[] @relation("CibiApprovedBy")
+  applicationsManagerApproved LoanApplication[] @relation("ManagerApprovedBy")
+  applicationsCommitteeBoardApproved LoanApplication[] @relation("CommitteeBoardApprovedBy")
+  applicationsFunded LoanApplication[] @relation("FundedBy")
   documentsUploaded   Document[] @relation("UploadedBy")
   notifications       Notification[]
   activityLogs       ActivityLog[]
@@ -176,10 +180,18 @@ model LoanApplication {
   memberId        String            @map("member_id")
   loanProductId   String?           @map("loan_product_id")
   collectorId     String?           @map("collector_id")
+  cibiApprovedById     String?      @map("cibi_approved_by_id")
+  managerApprovedById  String?      @map("manager_approved_by_id")
+  committeeBoardApprovedById String? @map("committee_board_approved_by_id")
+  fundedById         String?       @map("funded_by_id")
 
   member       Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   loanProduct  LoanProduct? @relation(fields: [loanProductId], references: [id], onDelete: SetNull)
   collector    User?       @relation("CollectorAssigned", fields: [collectorId], references: [id], onDelete: SetNull)
+  cibiApprovedBy    User?   @relation("CibiApprovedBy", fields: [cibiApprovedById], references: [id], onDelete: SetNull)
+  managerApprovedBy User?   @relation("ManagerApprovedBy", fields: [managerApprovedById], references: [id], onDelete: SetNull)
+  committeeBoardApprovedBy User? @relation("CommitteeBoardApprovedBy", fields: [committeeBoardApprovedById], references: [id], onDelete: SetNull)
+  fundedBy     User?       @relation("FundedBy", fields: [fundedById], references: [id], onDelete: SetNull)
   loan         Loan?
   documents    Document[]
 }
@@ -215,6 +227,7 @@ model AmortizationSchedule {
   interest    Float
   totalDue    Float    @map("total_due")
   penalty     Float    @default(0)
+  paidAmount  Float    @default(0) @map("paid_amount")
   isPaid      Boolean  @default(false) @map("is_paid")
   paidAt      DateTime? @map("paid_at")
   sequence    Int      // 1, 2, 3... for ordering
@@ -223,22 +236,35 @@ model AmortizationSchedule {
   loanId      String   @map("loan_id")
 
   loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payments Payment[]
+}
+
+enum PaymentStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 model Payment {
-  id           String   @id @default(cuid())
-  amount       Float
-  principal    Float
-  interest     Float
-  penalty      Float    @default(0)
-  paymentDate  DateTime @map("payment_date")
-  remarks      String?  @db.Text
-  createdAt    DateTime @default(now()) @map("created_at")
-  loanId       String   @map("loan_id")
-  collectedById String? @map("collected_by_id")
+  id              String        @id @default(cuid())
+  amount          Float
+  principal       Float         @default(0)
+  interest        Float         @default(0)
+  penalty         Float         @default(0)
+  paymentDate     DateTime      @map("payment_date")
+  paymentMethod   String?       @map("payment_method") // CASH, BPI, GCash, etc.
+  status          PaymentStatus @default(APPROVED) @map("status")
+  referenceNo     String?       @map("reference_no")
+  remarks         String?       @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+  loanId          String        @map("loan_id")
+  collectedById   String?       @map("collected_by_id")
+  amortizationScheduleId String? @map("amortization_schedule_id")
 
   loan         Loan  @relation(fields: [loanId], references: [id], onDelete: Cascade)
   collectedBy  User? @relation("CollectedBy", fields: [collectedById], references: [id], onDelete: SetNull)
+  receipt      Document? @relation("PaymentReceipt")
+  amortizationSchedule AmortizationSchedule? @relation(fields: [amortizationScheduleId], references: [id], onDelete: SetNull)
 }
 
 model LoanVoucher {
@@ -300,15 +326,17 @@ model Document {
   fileUrl       String   @map("file_url")
   fileSize      Int?     @map("file_size")
   mimeType      String?   @map("mime_type")
-  category      String   // REQUIREMENT | PHOTO | INVESTIGATION
+  category      String   // REQUIREMENT | PHOTO | INVESTIGATION | PAYMENT_RECEIPT
   applicationId String?  @map("application_id")
   requirementId String?  @map("requirement_id")
+  paymentId     String?  @unique @map("payment_id")
   uploadedById  String?  @map("uploaded_by_id")
   createdAt     DateTime @default(now()) @map("created_at")
 
   application  LoanApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   requirement  Requirement?     @relation(fields: [requirementId], references: [id], onDelete: SetNull)
   uploadedBy   User?            @relation("UploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  payment      Payment?         @relation("PaymentReceipt", fields: [paymentId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
@@ -336,4 +364,19 @@ model ActivityLog {
   userId     String?  @map("user_id")
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+enum PaymentMethodStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model PaymentMethod {
+  id             String              @id @default(cuid())
+  accountName    String              @map("account_name")
+  accountNumber  String              @map("account_number")
+  type           String              @map("type") // e.g. BPI, GCash, Other
+  status         PaymentMethodStatus @default(ACTIVE) @map("status")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
 }

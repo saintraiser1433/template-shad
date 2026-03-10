@@ -57,7 +57,17 @@ export default async function ReportsPage({
             }
           : {}),
       },
-      include: { member: { select: { memberNo: true, name: true } } },
+      include: {
+        member: { select: { memberNo: true, name: true } },
+        application: {
+          select: {
+            cibiApprovedBy: { select: { name: true } },
+            managerApprovedBy: { select: { name: true } },
+            committeeBoardApprovedBy: { select: { name: true } },
+            fundedBy: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.loan.aggregate({
@@ -88,7 +98,17 @@ export default async function ReportsPage({
             }
           : {}),
       },
-      include: { member: { select: { memberNo: true, name: true } } },
+      include: {
+        member: { select: { memberNo: true, name: true } },
+        application: {
+          select: {
+            cibiApprovedBy: { select: { name: true } },
+            managerApprovedBy: { select: { name: true } },
+            committeeBoardApprovedBy: { select: { name: true } },
+            fundedBy: { select: { name: true } },
+          },
+        },
+      },
     }),
     prisma.payment.aggregate({
       where: { paymentDate: { gte: todayStart, lt: tomorrowStart } },
@@ -213,6 +233,10 @@ export default async function ReportsPage({
                   <tr className="border-b bg-muted/50">
                     <th className="px-3 py-1.5 text-left font-medium">Loan No</th>
                     <th className="px-3 py-1.5 text-left font-medium">Member</th>
+                    <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">
                       Outstanding
                     </th>
@@ -225,7 +249,7 @@ export default async function ReportsPage({
                   {outstandingLoans.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={8}
                         className="px-3 py-10"
                       >
                         <EmptyState title="No outstanding loans" />
@@ -240,6 +264,18 @@ export default async function ReportsPage({
                         <td className="px-3 py-1.5 font-medium">{loan.loanNo}</td>
                         <td className="px-3 py-1.5">
                           {loan.member.name} ({loan.member.memberNo})
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.cibiApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.managerApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.committeeBoardApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.fundedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           ₱{loan.outstandingBalance.toLocaleString("en-PH")}
@@ -286,6 +322,10 @@ export default async function ReportsPage({
                   <tr className="border-b bg-muted/50">
                     <th className="px-3 py-1.5 text-left font-medium">Loan No</th>
                     <th className="px-3 py-1.5 text-left font-medium">Member</th>
+                    <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">
                       Outstanding
                     </th>
@@ -297,7 +337,7 @@ export default async function ReportsPage({
                 <tbody>
                   {delinquentLoans.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-3 py-10">
+                      <td colSpan={8} className="px-3 py-10">
                         <EmptyState title="No delinquent accounts" />
                       </td>
                     </tr>
@@ -310,6 +350,18 @@ export default async function ReportsPage({
                         <td className="px-3 py-1.5 font-medium">{loan.loanNo}</td>
                         <td className="px-3 py-1.5">
                           {loan.member.name} ({loan.member.memberNo})
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.cibiApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.managerApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.committeeBoardApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {loan.application?.fundedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           ₱{loan.outstandingBalance.toLocaleString("en-PH")}

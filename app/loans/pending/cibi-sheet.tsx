@@ -80,16 +80,26 @@ export function CibiSheet({
           />
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel>Close</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+          >
+            Close
+          </Button>
+          <Button
+            type="button"
             variant="outline"
             onClick={() => formRef.current?.saveDraft()}
           >
             Save draft
-          </AlertDialogAction>
-          <AlertDialogAction onClick={() => formRef.current?.submit()}>
+          </Button>
+          <Button
+            type="button"
+            onClick={() => formRef.current?.submit()}
+          >
             Submit to Manager
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

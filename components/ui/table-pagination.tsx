@@ -18,19 +18,49 @@ type TablePaginationProps = {
   totalItems: number
   initialPageSize?: number
   pageSizeOptions?: number[]
+  /** Controlled: current 1-based page */
+  page?: number
+  /** Controlled: called when page changes */
+  onPageChange?: (page: number) => void
+  /** Controlled: current page size */
+  pageSize?: number
+  /** Controlled: called when page size changes */
+  onPageSizeChange?: (pageSize: number) => void
 }
 
 export function TablePagination({
   totalItems,
   initialPageSize,
   pageSizeOptions = DEFAULT_PAGE_SIZES,
+  page: controlledPage,
+  onPageChange,
+  pageSize: controlledPageSize,
+  onPageSizeChange,
 }: TablePaginationProps) {
-  const [pageSize, setPageSize] = useState(
+  const [internalPageSize, setInternalPageSize] = useState(
     initialPageSize && pageSizeOptions.includes(initialPageSize)
       ? initialPageSize
       : pageSizeOptions[0]
   )
-  const [page, setPage] = useState(1)
+  const [internalPage, setInternalPage] = useState(1)
+
+  const isControlled =
+    controlledPage != null &&
+    onPageChange != null &&
+    controlledPageSize != null &&
+    onPageSizeChange != null
+  const pageSize = isControlled ? controlledPageSize : internalPageSize
+  const page = isControlled ? controlledPage : internalPage
+  const setPage = isControlled ? onPageChange! : setInternalPage
+  const setPageSize = (next: number) => {
+    if (isControlled) {
+      onPageSizeChange!(next)
+      onPageChange(1)
+    } else {
+      setInternalPageSize(next)
+      setInternalPage(1)
+    }
+  }
 
   const { pageCount, from, to } = useMemo(() => {
     if (totalItems === 0) {
@@ -65,7 +95,6 @@ export function TablePagination({
             onValueChange={(value) => {
               const nextSize = Number(value) || pageSize
               setPageSize(nextSize)
-              setPage(1)
             }}
           >
             <SelectTrigger className="h-7 w-16 px-2 text-xs">
@@ -95,7 +124,7 @@ export function TablePagination({
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage(Math.max(1, page - 1))}
             disabled={!canPrev}
           >
             <ChevronLeft className="size-3" />
@@ -103,7 +132,7 @@ export function TablePagination({
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            onClick={() => setPage(Math.min(pageCount, page + 1))}
             disabled={!canNext}
           >
             <ChevronRight className="size-3" />

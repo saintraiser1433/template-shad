@@ -52,6 +52,10 @@ export default async function LoansPendingPage({
     orderBy: { createdAt: "desc" },
     include: {
       member: true,
+      cibiApprovedBy: { select: { name: true } },
+      managerApprovedBy: { select: { name: true } },
+      committeeBoardApprovedBy: { select: { name: true } },
+      fundedBy: { select: { name: true } },
     },
   })
 
@@ -105,6 +109,10 @@ export default async function LoansPendingPage({
                     <th className="px-3 py-1.5 text-left font-medium">Type</th>
                     <th className="px-3 py-1.5 text-left font-medium">Amount</th>
                     <th className="px-3 py-1.5 text-left font-medium">Status</th>
+                    <th className="px-3 py-1.5 text-left font-medium">CI/BI who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Manager who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Committee/Board who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
                     <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -112,7 +120,7 @@ export default async function LoansPendingPage({
                   {applications.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={10}
                         className="px-3 py-10"
                       >
                         <EmptyState
@@ -142,6 +150,18 @@ export default async function LoansPendingPage({
                         </td>
                         <td className="px-3 py-1.5">
                           <Badge variant="secondary">{app.status}</Badge>
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.cibiApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.managerApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.committeeBoardApprovedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {app.fundedBy?.name ?? "—"}
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <div className="flex items-center justify-end gap-1">
