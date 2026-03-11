@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { AlertTriangle } from "lucide-react"
 import { LoanApplicationForm } from "./loan-application-form"
+import { checkRenewalEligibility } from "@/lib/loan-calculator"
 
 export default async function LoanApplyPage({
   searchParams,
@@ -69,11 +70,20 @@ export default async function LoanApplyPage({
           orderBy: { createdAt: "desc" },
           select: {
             loanNo: true,
+            principalAmount: true,
             outstandingBalance: true,
             status: true,
           },
         })
       : null
+
+  const renewalEligible =
+    !!existingLoan &&
+    existingLoan.outstandingBalance > 0.01 &&
+    checkRenewalEligibility(
+      Math.max(0, existingLoan.principalAmount - existingLoan.outstandingBalance),
+      existingLoan.principalAmount
+    )
 
   const loanProductsWithReqs = loanProducts.map((p) => ({
     ...p,
@@ -104,7 +114,7 @@ export default async function LoanApplyPage({
           </Breadcrumb>
         }
       />
-      {isMemberRole && existingLoan ? (
+      {isMemberRole && existingLoan && !renewalEligible ? (
         <div className="flex flex-1 items-center justify-center p-4 pt-6">
           <div className="w-full max-w-2xl text-center">
             <div className="flex flex-col items-center gap-4">
@@ -117,8 +127,8 @@ export default async function LoanApplyPage({
                 </h2>
                 <p className="mt-2 text-base text-muted-foreground">
                   You currently have loan {existingLoan.loanNo} with an outstanding balance of{" "}
-                  ₱{existingLoan.outstandingBalance.toLocaleString("en-PH")}. You need to fully pay
-                  this loan before applying for a new one.
+                  ₱{existingLoan.outstandingBalance.toLocaleString("en-PH")}. You need to pay at least{" "}
+                  70% of the current loan principal (or fully pay this loan) before applying for a new one.
                 </p>
               </div>
             </div>

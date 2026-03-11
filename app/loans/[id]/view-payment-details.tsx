@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Eye, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
+import { formatDate } from "@/lib/date-format"
 import { Textarea } from "@/components/ui/textarea"
 
 type PaymentRow = {
@@ -93,7 +94,7 @@ export function ViewPaymentDetailsButton({
     }
   }
 
-  const dateStr = new Date(payment.paymentDate).toLocaleDateString("en-PH")
+  const dateStr = formatDate(payment.paymentDate)
   const methodLabel = payment.paymentMethod ?? "—"
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
 

@@ -13,6 +13,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { RecordPaymentForm } from "./record-payment-form"
+import { formatDate } from "@/lib/date-format"
 
 export default async function PaymentsPage() {
   const session = await auth()
@@ -106,10 +107,7 @@ export default async function PaymentsPage() {
                         {p.amount.toLocaleString("en-PH")}
                       </span>
                       <span className="text-muted-foreground">
-                        {new Date(p.paymentDate).toLocaleTimeString("en-PH", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatDate(p.paymentDate)}
                       </span>
                     </div>
                   ))}

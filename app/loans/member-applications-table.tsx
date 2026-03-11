@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import { Info } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
+import { ViewRemarksButton } from "@/components/view-remarks-button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ type MemberApplicationRow = {
   amount: number
   status: string
   rejectionReason: string | null
+  approvalRemarks: string | null
   cibiApprovedByName?: string | null
   managerApprovedByName?: string | null
   committeeApprovedByName?: string | null
@@ -47,6 +49,7 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
               <th className="px-3 py-1.5 text-left font-medium">Committee who approved</th>
               <th className="px-3 py-1.5 text-left font-medium">Board who approved</th>
               <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
+              <th className="px-3 py-1.5 text-left font-medium">Remarks</th>
               <th className="px-3 py-1.5 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -54,7 +57,7 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={11}
                   className="px-3 py-10"
                 >
                   <span className="text-xs text-muted-foreground">No loan applications yet.</span>
@@ -70,23 +73,21 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
                   <td className="px-3 py-1.5">{app.typeLabel}</td>
                   <td className="px-3 py-1.5">₱{app.amount.toLocaleString("en-PH")}</td>
                   <td className="px-3 py-1.5">
-                    <Badge
-                      variant={
-                        app.status === "PENDING" || app.status === "CIBI_REVIEW"
-                          ? "secondary"
-                          : app.status === "REJECTED"
-                            ? "destructive"
-                            : "default"
-                      }
-                    >
-                      {app.status.replace(/_/g, " ")}
-                    </Badge>
+                    <StatusBadge status={app.status} />
                   </td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.cibiApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.managerApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.committeeApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.boardApprovedByName ?? "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground">{app.fundedByName ?? "—"}</td>
+                  <td className="px-3 py-1.5">
+                    <ViewRemarksButton
+                      applicationNo={app.applicationNo}
+                      remarks={app.approvalRemarks}
+                      label="View"
+                      size="sm"
+                    />
+                  </td>
                   <td className="px-3 py-1.5 text-right">
                     {app.status === "REJECTED" && app.rejectionReason ? (
                       <Button

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { createActivityLog } from "@/lib/activity-log"
 import { z } from "zod"
+import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
+import { computePenalty } from "@/lib/loan-calculator"
 
 const createPaymentSchema = z.object({
   amount: z.number().positive(),
@@ -61,11 +64,14 @@ export async function POST(
   const isCash = !paymentMethod || paymentMethod.toUpperCase() === "CASH"
   const isMember = session.user.role === "MEMBER"
   const createPendingOnly = isMember && !isCash
+  const financeRoles = ["TREASURER", "LOANS_CLERK", "DISBURSING_STAFF", "CASHIER"]
+  const isFinanceOfficer =
+    session.user.role === "ADMIN" || financeRoles.includes(session.user.role)
 
   const loan = await prisma.loan.findUnique({
     where: { id },
     include: {
-      member: { select: { userId: true } },
+      member: { select: { userId: true, name: true, memberNo: true } },
       application: {
         include: { loanProduct: true },
       },
@@ -103,6 +109,12 @@ export async function POST(
         { status: 400 },
       )
     }
+    if (!receiptDocumentId) {
+      return NextResponse.json(
+        { error: "Receipt/evidence of payment is required." },
+        { status: 400 },
+      )
+    }
     const payment = await prisma.payment.create({
       data: {
         loanId: id,
@@ -136,7 +148,43 @@ export async function POST(
         })
       }
     }
+    // Notify finance officers that a member payment is pending approval
+    const financeUsers = await prisma.user.findMany({
+      where: { role: { in: ["TREASURER", "ADMIN"] }, status: "ACTIVE" },
+      select: { id: true },
+    })
+    const memberLabel =
+      loan.member.name && loan.member.memberNo
+        ? `${loan.member.name} (${loan.member.memberNo})`
+        : "A member"
+    const amountStr = `₱${amount.toLocaleString("en-PH")}`
+    if (financeUsers.length > 0) {
+      await prisma.notification.createMany({
+        data: financeUsers.map((u) => ({
+          userId: u.id,
+          title: "Payment pending approval",
+          message: `${memberLabel} submitted a payment of ${amountStr} for loan ${loan.loanNo}. Pending your approval.`,
+          type: "PAYMENT_PENDING_APPROVAL",
+          link: `/loans/${id}`,
+        })),
+      })
+    }
+    await createActivityLog({
+      userId: session.user.id,
+      action: "PAYMENT_RECORDED",
+      entityType: "Payment",
+      entityId: payment.id,
+      details: `Loan ${loan.loanNo} · ${amountStr} · Pending approval`,
+    })
     return NextResponse.json(payment)
+  }
+
+  // Finance/non-member non-cash payments must include receipt upload
+  if (isFinanceOfficer && !isCash && !receiptDocumentId) {
+    return NextResponse.json(
+      { error: "Receipt/evidence of payment is required for non-cash payments." },
+      { status: 400 },
+    )
   }
 
   let remaining = amount
@@ -161,6 +209,25 @@ export async function POST(
   for (const row of schedule) {
     if (targetScheduleId && row.id !== targetScheduleId) continue
     if (row.isPaid || remaining <= 0) continue
+
+    // Grace period rule: within 7 days after due date, no penalty is applied.
+    // After grace, compute/update penalty for this schedule row as of the payment date.
+    const cfg = LOAN_TYPE_CONFIG[loan.loanType]
+    const penaltyComputed = computePenalty(
+      row.totalDue,
+      row.dueDate,
+      paymentDate,
+      cfg.penaltyRate,
+      cfg.penaltyBase,
+    )
+    if (Math.abs((row.penalty ?? 0) - penaltyComputed) > 0.01) {
+      await prisma.amortizationSchedule.update({
+        where: { id: row.id },
+        data: { penalty: penaltyComputed },
+      })
+      row.penalty = penaltyComputed
+    }
+
     const totalDue = row.totalDue + row.penalty
     const alreadyPaid = row.paidAmount ?? 0
     const stillOwed = Math.max(0, totalDue - alreadyPaid)
@@ -240,8 +307,35 @@ export async function POST(
       remarks,
       referenceNo: referenceNo || null,
       collectedById: session.user.id,
+      approvedById: isFinanceOfficer ? session.user.id : null,
       amortizationScheduleId: scheduleId ?? undefined,
     },
+  })
+
+  if (receiptDocumentId) {
+    const receipt = await prisma.document.findUnique({
+      where: { id: receiptDocumentId },
+      select: { id: true, uploadedById: true, category: true, paymentId: true },
+    })
+    if (
+      receipt &&
+      receipt.uploadedById === session.user.id &&
+      receipt.category === "PAYMENT_RECEIPT" &&
+      !receipt.paymentId
+    ) {
+      await prisma.document.update({
+        where: { id: receiptDocumentId },
+        data: { paymentId: payment.id },
+      })
+    }
+  }
+  const amountStr = `₱${amount.toLocaleString("en-PH")}`
+  await createActivityLog({
+    userId: session.user.id,
+    action: "PAYMENT_RECORDED",
+    entityType: "Payment",
+    entityId: payment.id,
+    details: `Loan ${loan.loanNo} · ${amountStr} · Approved`,
   })
   return NextResponse.json(payment)
 }

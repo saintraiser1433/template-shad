@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { Check, X } from "lucide-react"
 import { toast } from "sonner"
@@ -34,9 +34,7 @@ export function MemberStatusButtons({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <Badge variant={status === "ACTIVE" ? "default" : "secondary"} className="shrink-0">
-        {status}
-      </Badge>
+      <StatusBadge status={status} className="shrink-0" />
       <div className="flex gap-0.5">
         <Button
           variant="action"

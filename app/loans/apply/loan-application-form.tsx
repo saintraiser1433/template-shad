@@ -34,8 +34,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { checkRenewalEligibility } from "@/lib/loan-calculator"
 
 type MemberOption = { id: string; memberNo: string; name: string; cbu: number }
+type ExistingLoanInfo = {
+  id: string
+  loanNo: string
+  status: string
+  principalAmount: number
+  outstandingBalance: number
+}
 
 const applicationSchema = z.object({
   memberId: z.string().min(1, "Select a member"),
@@ -64,6 +72,7 @@ export function LoanApplicationForm({
   const [selectedProduct, setSelectedProduct] = useState<LoanTypeOption | null>(null)
   const [submittedApplicationId, setSubmittedApplicationId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [existingLoan, setExistingLoan] = useState<ExistingLoanInfo | null>(null)
 
   const {
     register,
@@ -135,6 +144,63 @@ export function LoanApplicationForm({
     () => members.find((m) => m.id === memberId),
     [members, memberId]
   )
+
+  useEffect(() => {
+    if (!memberId) {
+      setExistingLoan(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/loans?memberId=${encodeURIComponent(memberId)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : []
+        const current = list
+          .filter((l: any) =>
+            ["ACTIVE", "DELINQUENT"].includes(String(l.status ?? "").toUpperCase())
+          )
+          .sort(
+            (a: any, b: any) =>
+              new Date(String(b.createdAt ?? 0)).getTime() -
+              new Date(String(a.createdAt ?? 0)).getTime()
+          )[0]
+        if (!current) {
+          setExistingLoan(null)
+          return
+        }
+        setExistingLoan({
+          id: String(current.id),
+          loanNo: String(current.loanNo),
+          status: String(current.status),
+          principalAmount: Number(current.principalAmount ?? 0),
+          outstandingBalance: Number(current.outstandingBalance ?? 0),
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setExistingLoan(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [memberId])
+
+  const renewal = useMemo(() => {
+    if (!existingLoan) return null
+    if (!Number.isFinite(existingLoan.principalAmount) || existingLoan.principalAmount <= 0) return null
+    if (!Number.isFinite(existingLoan.outstandingBalance) || existingLoan.outstandingBalance <= 0.01) return null
+    const paid = Math.max(0, existingLoan.principalAmount - existingLoan.outstandingBalance)
+    const eligible = checkRenewalEligibility(paid, existingLoan.principalAmount)
+    const percentPaid = (paid / existingLoan.principalAmount) * 100
+    return {
+      eligible,
+      paid,
+      percentPaid,
+      deducted: existingLoan.outstandingBalance,
+      loanNo: existingLoan.loanNo,
+      status: existingLoan.status,
+    }
+  }, [existingLoan])
 
   const maxAmount = useMemo(() => {
     if (!selectedMember || !selectedProduct) return 0
@@ -316,6 +382,11 @@ export function LoanApplicationForm({
             {loanSummary && (
               <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-xs">
                 <p className="font-medium">Loan summary (estimate)</p>
+                {renewal?.deducted != null && renewal.deducted > 0.01 && (
+                  <p className="mt-1 text-muted-foreground">
+                    Renewal: existing loan {renewal.loanNo} ({renewal.percentPaid.toFixed(0)}% paid)
+                  </p>
+                )}
                 {selectedProduct.maxCbuPercent != null && amount > 0 && (
                   <>
                     <p className="mt-1">
@@ -359,6 +430,22 @@ export function LoanApplicationForm({
                         amount * (selectedProduct.maxCbuPercent / 100)
                       ).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                     </p>
+                    {renewal?.deducted != null && renewal.deducted > 0.01 && (
+                      <p className="mt-1">
+                        Renewal deduction (remaining balance): ₱
+                        {renewal.deducted.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
+                    {renewal?.deducted != null && renewal.deducted > 0.01 && (
+                      <p className="mt-1 font-medium">
+                        Net proceeds (after CBU + renewal deduction): ₱
+                        {(
+                          amount -
+                          amount * (selectedProduct.maxCbuPercent / 100) -
+                          renewal.deducted
+                        ).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
                   </>
                 )}
                 <p className="mt-1">

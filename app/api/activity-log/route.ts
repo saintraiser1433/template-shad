@@ -17,10 +17,12 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, Number(searchParams.get("page")) || 1)
   const action = searchParams.get("action")?.trim() || undefined
   const entityType = searchParams.get("entityType")?.trim() || undefined
+  const role = searchParams.get("role")?.trim() || undefined
 
   const where = {
     ...(action ? { action } : {}),
     ...(entityType ? { entityType } : {}),
+    ...(role ? { user: { role } } : {}),
   }
 
   const [logs, total] = await Promise.all([
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, role: true } },
       },
     }),
     prisma.activityLog.count({ where }),

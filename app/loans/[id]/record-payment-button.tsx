@@ -129,6 +129,7 @@ export function RecordPaymentButton({
       setAmountRaw("")
       setReceiptFile(null)
       setReceiptDocId(null)
+      setReferenceNo("")
       setError(null)
     }
   }, [open, fetchPaymentMethods])
@@ -152,11 +153,12 @@ export function RecordPaymentButton({
   const isPartialValid = modePartial && amountNum > 0 && amountNum < fullAmount
   const isFullValid =
     modeFull && fullAmount > 0 && Math.abs(amountNum - fullAmount) < 0.01
+  const requiresReceiptUpload = !isCashSelected
   const isMemberOnline = !isFinanceOfficer && !isCashSelected
   const canSubmit = selectedMethodId && (isPartialValid || isFullValid)
 
   async function uploadReceiptIfNeeded(): Promise<string | null> {
-    if (!isMemberOnline) return null
+    if (!requiresReceiptUpload) return null
     if (receiptDocId) return receiptDocId
     if (!receiptFile) {
       setError("Receipt/evidence of payment is required.")
@@ -185,7 +187,7 @@ export function RecordPaymentButton({
     setError(null)
     if (!canSubmit) return
     const receiptDocumentId = await uploadReceiptIfNeeded()
-    if (isMemberOnline && !receiptDocumentId) return
+    if (requiresReceiptUpload && !receiptDocumentId) return
     const finalAmount = modeFull ? fullAmount : amountNum
     if (finalAmount <= 0) {
       setError("Enter a valid amount")
@@ -245,7 +247,7 @@ export function RecordPaymentButton({
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Pay online</AlertDialogTitle>
+            <AlertDialogTitle>Payments</AlertDialogTitle>
           </AlertDialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -292,7 +294,7 @@ export function RecordPaymentButton({
                   </Field>
                 </>
               )}
-              {isMemberOnline && (
+              {requiresReceiptUpload && (
                 <Field>
                   <FieldLabel>Upload receipt / evidence *</FieldLabel>
                   <div className="space-y-2">
@@ -315,7 +317,7 @@ export function RecordPaymentButton({
                       className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-input file:bg-muted/30 file:px-3 file:py-1.5 file:text-xs file:font-medium"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      Required for online payments. Allowed: PDF, images, Word.
+                      Required for non-cash payments. Allowed: PDF, images, Word.
                     </p>
                     {receiptDocId && (
                       <p className="text-[11px] text-muted-foreground">
@@ -358,19 +360,21 @@ export function RecordPaymentButton({
                   </div>
                 </Field>
               )}
-              <Field>
-                <FieldLabel>Reference number{isMemberOnline ? " *" : ""}</FieldLabel>
-                <Input
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                  placeholder="e.g. GCASH ref, bank code"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {isMemberOnline
-                    ? "Required for online payments. Enter the transaction or reference number from the payment slip."
-                    : "Optional. Enter the transaction or reference number from the payment slip."}
-                </p>
-              </Field>
+              {!isCashSelected && (
+                <Field>
+                  <FieldLabel>Reference number{isMemberOnline ? " *" : ""}</FieldLabel>
+                  <Input
+                    value={referenceNo}
+                    onChange={(e) => setReferenceNo(e.target.value)}
+                    placeholder="e.g. GCASH ref, bank code"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {isMemberOnline
+                      ? "Required for online payments. Enter the transaction or reference number from the payment slip."
+                      : "Optional. Enter the transaction or reference number from the payment slip."}
+                  </p>
+                </Field>
+              )}
               <Field>
                 <div className="flex items-center gap-6">
                   <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">

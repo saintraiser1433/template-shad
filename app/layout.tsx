@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   title: "MCFMP-CMLMS | Muslim Christian Fisherfolks Cooperative",
   description:
     "Muslim Christian Fisherfolks Multi-Purpose Cooperative Money Lending and Management System",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

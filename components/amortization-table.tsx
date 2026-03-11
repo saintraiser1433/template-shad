@@ -1,3 +1,6 @@
+import { formatDate } from "@/lib/date-format"
+import { StatusBadge } from "@/components/status-badge"
+
 type ScheduleRow = {
   id: string
   dueDate: Date
@@ -33,6 +36,7 @@ export function AmortizationTable({
             <th className="px-3 py-1.5 text-right font-medium">Total due</th>
             <th className="px-3 py-1.5 text-right font-medium">Penalty</th>
             <th className="px-3 py-1.5 text-right font-medium">CBU added</th>
+            <th className="px-3 py-1.5 text-left font-medium">Mode</th>
             <th className="px-3 py-1.5 text-left font-medium">Status</th>
             {renderAction && (
               <th className="px-3 py-1.5 text-right font-medium">Action</th>
@@ -61,7 +65,7 @@ export function AmortizationTable({
               >
                 <td className="px-3 py-1.5">{row.sequence}</td>
                 <td className="px-3 py-1.5">
-                  {due.toLocaleDateString("en-PH")}
+                  {formatDate(due)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   ₱{row.principal.toLocaleString("en-PH")}
@@ -82,20 +86,34 @@ export function AmortizationTable({
                 </td>
                 <td className="px-3 py-1.5">
                   {row.isPaid ? (
-                    <span className="text-muted-foreground">
-                      Paid
-                      {row.paidAt &&
-                        ` ${new Date(row.paidAt).toLocaleDateString("en-PH")}`}
+                    <StatusBadge status="PAID" label="Full payment" />
+                  ) : isPartial ? (
+                    <StatusBadge status="PARTIAL" label="Partial payment" />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5">
+                  {row.isPaid ? (
+                    <span className="flex items-center gap-1.5">
+                      <StatusBadge status="PAID" />
+                      {row.paidAt && (
+                        <span className="text-muted-foreground text-[11px]">
+                          {formatDate(row.paidAt)}
+                        </span>
+                      )}
                     </span>
                   ) : isPartial ? (
-                    <span className="text-amber-700 font-medium">
-                      Partial — ₱{paid.toLocaleString("en-PH")} / ₱
-                      {totalDue.toLocaleString("en-PH")}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status="PARTIAL" />
+                      <span className="text-muted-foreground text-[11px]">
+                        ₱{paid.toLocaleString("en-PH")} / ₱{totalDue.toLocaleString("en-PH")}
+                      </span>
                     </span>
                   ) : isOverdue ? (
-                    <span className="text-destructive font-medium">Overdue</span>
+                    <StatusBadge status="OVERDUE" />
                   ) : (
-                    <span className="text-muted-foreground">Pending</span>
+                    <StatusBadge status="PENDING" label="Pending" />
                   )}
                 </td>
                 {renderAction && (

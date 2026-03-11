@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { formatDate } from "@/lib/date-format"
 
 type NotificationItem = {
   id: string
@@ -132,7 +133,7 @@ export function NotificationBell() {
                       {n.message}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(n.createdAt).toLocaleString()}
+                      {formatDate(n.createdAt)}
                     </p>
                   </Link>
                 ) : (
@@ -142,7 +143,7 @@ export function NotificationBell() {
                       {n.message}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(n.createdAt).toLocaleString()}
+                      {formatDate(n.createdAt)}
                     </p>
                   </div>
                 )}

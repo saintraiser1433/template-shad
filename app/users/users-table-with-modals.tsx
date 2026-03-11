@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { ModuleHeader } from "@/components/module-header"
 import { TableSearchForm } from "@/components/table-search-form"
@@ -22,6 +23,7 @@ import {
 import { UserFormModal } from "./user-form-modal"
 import { UserPlus, Pencil, UserX, UserCheck } from "lucide-react"
 import { toast } from "sonner"
+import { formatDate } from "@/lib/date-format"
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
@@ -164,19 +166,13 @@ export function UsersTableWithModals({
                         </Badge>
                       </td>
                       <td className="px-3 py-1.5">
-                        <Badge
-                          variant={u.status === "ACTIVE" ? "default" : "secondary"}
-                          className={
-                            u.status === "ACTIVE"
-                              ? "bg-emerald-600 hover:bg-emerald-600/90"
-                              : "bg-muted text-muted-foreground"
-                          }
-                        >
-                          {u.status === "ACTIVE" ? "Active" : "Inactive"}
-                        </Badge>
+                        <StatusBadge
+                          status={u.status}
+                          label={u.status === "ACTIVE" ? "Active" : "Inactive"}
+                        />
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">
-                        {new Date(u.createdAt).toLocaleDateString()}
+                        {formatDate(u.createdAt)}
                       </td>
                       <td className="px-3 py-1.5 text-right">
                         <div className="flex items-center justify-end gap-1">

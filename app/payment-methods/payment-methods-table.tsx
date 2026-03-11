@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState } from "@/components/empty-state"
@@ -213,13 +213,7 @@ export function PaymentMethodsTable({
                         <td className="px-3 py-1.5">{row.accountNumber}</td>
                         <td className="px-3 py-1.5">{row.type}</td>
                         <td className="px-3 py-1.5">
-                          <Badge
-                            variant={
-                              row.status === "ACTIVE" ? "default" : "secondary"
-                            }
-                          >
-                            {row.status}
-                          </Badge>
+                          <StatusBadge status={row.status} />
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <div className="flex justify-end gap-0.5">

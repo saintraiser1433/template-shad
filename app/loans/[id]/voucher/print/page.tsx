@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { formatDate } from "@/lib/date-format"
 
 export default async function LoanVoucherPrintPage({
   params,
@@ -33,7 +34,7 @@ export default async function LoanVoucherPrintPage({
           <p><strong>Principal:</strong> ₱{loan.principalAmount.toLocaleString("en-PH")}</p>
           <p><strong>Release method:</strong> {v.releaseMethod}</p>
           {v.chequeNo && <p><strong>Cheque no:</strong> {v.chequeNo}</p>}
-          <p><strong>Released at:</strong> {new Date(v.releasedAt).toLocaleString()}</p>
+          <p><strong>Released at:</strong> {formatDate(v.releasedAt)}</p>
         </div>
         <p className="text-center text-xs text-muted-foreground">
           This voucher may be presented for payment validation. MCFMP Cooperative.

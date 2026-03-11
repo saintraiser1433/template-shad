@@ -43,6 +43,8 @@ export default async function ReportsPage({
     todayCollections,
     totalCbu,
     memberCount,
+    recentCollections,
+    members,
   ] = await Promise.all([
     prisma.loan.findMany({
       where: {
@@ -118,6 +120,22 @@ export default async function ReportsPage({
     }),
     prisma.member.aggregate({ _sum: { cbu: true } }),
     prisma.member.count(),
+    prisma.payment.findMany({
+      orderBy: { paymentDate: "desc" },
+      take: 50,
+      include: {
+        loan: {
+          select: {
+            loanNo: true,
+            member: { select: { memberNo: true, name: true } },
+          },
+        },
+      },
+    }),
+    prisma.member.findMany({
+      orderBy: { memberNo: "asc" },
+      take: 50,
+    }),
   ])
 
   return (
@@ -144,18 +162,6 @@ export default async function ReportsPage({
             Portfolio overview: outstanding balances, collections, delinquency, and member CBU.
           </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Generate report</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Export loans, collections, or members list as Excel or PDF.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ReportExportForm />
-          </CardContent>
-        </Card>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -211,6 +217,136 @@ export default async function ReportsPage({
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Generate report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Export loans, collections, or members list as Excel or PDF.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ReportExportForm />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-col gap-1">
+            <CardTitle className="text-sm font-medium">Recent collections</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Latest payments recorded in the system (max 50).
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-1.5 text-left font-medium">Date</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Loan No</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Member</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Amount</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Principal</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Interest</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Penalty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentCollections.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-10">
+                        <EmptyState title="No collections found" />
+                      </td>
+                    </tr>
+                  ) : (
+                    recentCollections.map((p) => (
+                      <tr
+                        key={p.id}
+                        className="border-b transition-colors hover:bg-muted/30"
+                      >
+                        <td className="px-3 py-1.5">
+                          {p.paymentDate.toLocaleDateString("en-PH", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          }).toUpperCase()}
+                        </td>
+                        <td className="px-3 py-1.5 font-medium">{p.loan.loanNo}</td>
+                        <td className="px-3 py-1.5">
+                          {p.loan.member.name} ({p.loan.member.memberNo})
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          ₱{p.amount.toLocaleString("en-PH")}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          ₱{p.principal.toLocaleString("en-PH")}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          ₱{p.interest.toLocaleString("en-PH")}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          ₱{p.penalty.toLocaleString("en-PH")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-col gap-1">
+            <CardTitle className="text-sm font-medium">Members snapshot</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              First 50 members by member number, with CBU and loan count.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-1.5 text-left font-medium">Member No</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Name</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Contact</th>
+                    <th className="px-3 py-1.5 text-right font-medium">CBU (₱)</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Loans</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-10">
+                        <EmptyState title="No members found" />
+                      </td>
+                    </tr>
+                  ) : (
+                    members.map((m) => (
+                      <tr
+                        key={m.id}
+                        className="border-b transition-colors hover:bg-muted/30"
+                      >
+                        <td className="px-3 py-1.5 font-medium">{m.memberNo}</td>
+                        <td className="px-3 py-1.5">{m.name}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {m.contactNo || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          ₱{m.cbu.toLocaleString("en-PH")}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          {m._count?.loans ?? 0}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="flex flex-col gap-4">

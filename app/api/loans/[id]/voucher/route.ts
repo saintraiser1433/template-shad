@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { createActivityLog } from "@/lib/activity-log"
 import { z } from "zod"
 
 const createVoucherSchema = z.object({
@@ -25,6 +26,19 @@ export async function GET(
   if (!voucher) {
     return NextResponse.json({ error: "Voucher not found" }, { status: 404 })
   }
+  // Access control:
+  // - Finance/Admin can view any voucher
+  // - Members can only view vouchers for their own loans
+  const role = session.user.role
+  const financeRoles = ["TREASURER", "LOANS_CLERK", "DISBURSING_STAFF", "CASHIER"]
+  const canViewAny = role === "ADMIN" || financeRoles.includes(role)
+  const isOwnMemberLoan =
+    role === "MEMBER" &&
+    voucher.loan.member.userId != null &&
+    voucher.loan.member.userId === session.user.id
+  if (!canViewAny && !isOwnMemberLoan) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
   return NextResponse.json(voucher)
 }
 
@@ -39,7 +53,10 @@ export async function POST(
   const { id: loanId } = await params
   const loan = await prisma.loan.findUnique({
     where: { id: loanId },
-    include: { application: true },
+    include: {
+      application: true,
+      member: true,
+    },
   })
   if (!loan) {
     return NextResponse.json({ error: "Loan not found" }, { status: 404 })
@@ -76,11 +93,35 @@ export async function POST(
     include: { loan: { include: { member: true } } },
   })
 
+  // Mark voucher + passbook as issued for payment validation
+  await prisma.loan.update({
+    where: { id: loanId },
+    data: {
+      voucherIssuedAt: loan.voucherIssuedAt ?? voucher.releasedAt,
+      voucherIssuedById: loan.voucherIssuedById ?? session.user.id,
+      passbookIssuedAt: loan.passbookIssuedAt ?? voucher.releasedAt,
+      passbookIssuedById: loan.passbookIssuedById ?? session.user.id,
+      releasedAt: loan.releasedAt ?? voucher.releasedAt,
+    },
+  })
+
   if (loan.applicationId) {
     await prisma.loanApplication.update({
       where: { id: loan.applicationId },
       data: { status: "RELEASED" },
     })
+    const app = loan.application
+    if (app) {
+      const appNo = app.applicationNo
+      const memberLabel = loan.member?.name ?? loan.member?.memberNo ?? "Unknown member"
+      await createActivityLog({
+        userId: session.user.id,
+        action: "APP_RELEASED",
+        entityType: "LoanApplication",
+        entityId: loan.applicationId,
+        details: `Application ${appNo} · ${memberLabel} · Loan ${loan.loanNo} · Voucher ${voucherNo}`,
+      })
+    }
   }
 
   return NextResponse.json(voucher, { status: 201 })

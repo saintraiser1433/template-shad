@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { createActivityLog } from "@/lib/activity-log"
 import type { ApplicationStatus } from "@prisma/client"
 
 const VALID_TRANSITIONS: Record<string, ApplicationStatus[]> = {
@@ -123,6 +124,40 @@ export async function PATCH(
     where: { id },
     data: updateData,
   })
+
+  if (newStatus) {
+    const fromStatus = application.status
+    const appNo = application.applicationNo
+    const memberLabel =
+      application.member?.name || application.member?.memberNo || "Unknown member"
+    let logAction: string | null = null
+    if (fromStatus === "PENDING" && newStatus === "MANAGER_REVIEW") logAction = "APP_CIBI_APPROVED"
+    else if (fromStatus === "PENDING" && newStatus === "CIBI_REVIEW") logAction = "APPLICATION_STATUS_CHANGED"
+    else if (fromStatus === "CIBI_REVIEW" && newStatus === "MANAGER_REVIEW") logAction = "APP_CIBI_APPROVED"
+    else if (fromStatus === "CIBI_REVIEW" && newStatus === "REJECTED") logAction = "APP_CIBI_REJECTED"
+    else if (fromStatus === "MANAGER_REVIEW" && newStatus === "APPROVED") logAction = "APP_MANAGER_APPROVED"
+    else if (fromStatus === "MANAGER_REVIEW" && newStatus === "COMMITTEE_REVIEW") logAction = "APP_MANAGER_ENDORSED"
+    else if (fromStatus === "MANAGER_REVIEW" && newStatus === "REJECTED") logAction = "APP_MANAGER_REJECTED"
+    else if (fromStatus === "COMMITTEE_REVIEW" && newStatus === "BOARD_REVIEW") logAction = "APP_COMMITTEE_ENDORSED"
+    else if (fromStatus === "COMMITTEE_REVIEW" && newStatus === "REJECTED") logAction = "APP_COMMITTEE_REJECTED"
+    else if (fromStatus === "BOARD_REVIEW" && newStatus === "APPROVED") logAction = "APP_BOARD_APPROVED"
+    else if (fromStatus === "BOARD_REVIEW" && newStatus === "REJECTED") logAction = "APP_BOARD_REJECTED"
+    else if (fromStatus === "APPROVED" && newStatus === "FUNDED") logAction = "APP_FUNDED"
+    else if (fromStatus === "FUNDED" && newStatus === "RELEASED") logAction = "APP_RELEASED"
+    else logAction = "APPLICATION_STATUS_CHANGED"
+
+    const detailsParts = [`Application ${appNo}`, memberLabel]
+    if (newStatus === "REJECTED" && body.rejectionReason) {
+      detailsParts.push(`Reason: ${(body.rejectionReason as string).slice(0, 200)}`)
+    }
+    await createActivityLog({
+      userId,
+      action: logAction,
+      entityType: "LoanApplication",
+      entityId: id,
+      details: detailsParts.join(" · "),
+    })
+  }
 
   const memberLabel =
     application.member?.name || application.member?.memberNo || "A member"

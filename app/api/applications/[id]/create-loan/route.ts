@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
-import { computeAmortization } from "@/lib/loan-calculator"
+import { checkRenewalEligibility, computeAmortization } from "@/lib/loan-calculator"
 import type { AmortizationType } from "@prisma/client"
 
 export async function POST(
@@ -38,7 +38,7 @@ export async function POST(
   }
 
   const config = LOAN_TYPE_CONFIG[application.loanType]
-  const principal = application.amount
+  const principalRequested = application.amount
   const termMonths = application.termMonths ?? 1
   const termDays = application.termDays ?? termMonths * 30
   const rate = config.interestRate
@@ -49,6 +49,37 @@ export async function POST(
         ? termMonths
         : termMonths
   const startDate = new Date()
+  const existingUnpaidLoan = await prisma.loan.findFirst({
+    where: {
+      memberId: application.memberId,
+      status: { in: ["ACTIVE", "DELINQUENT"] },
+      outstandingBalance: { gt: 0.01 },
+    },
+    select: { id: true, principalAmount: true, outstandingBalance: true },
+    orderBy: { createdAt: "desc" },
+  })
+
+  let principal = principalRequested
+  let renewalDeducted = 0
+  if (existingUnpaidLoan) {
+    const paid = Math.max(0, existingUnpaidLoan.principalAmount - existingUnpaidLoan.outstandingBalance)
+    const eligible = checkRenewalEligibility(paid, existingUnpaidLoan.principalAmount)
+    if (!eligible) {
+      return NextResponse.json(
+        { error: "Loan renewal requires at least 70% of the current loan principal to be paid." },
+        { status: 400 },
+      )
+    }
+    renewalDeducted = existingUnpaidLoan.outstandingBalance
+    principal = Math.max(0, principalRequested - renewalDeducted)
+    if (principal <= 0.01) {
+      return NextResponse.json(
+        { error: "Renewal deduction exceeds or equals the requested loan amount." },
+        { status: 400 },
+      )
+    }
+  }
+
   const scheduleRows = computeAmortization(
     principal,
     rate,
@@ -74,6 +105,8 @@ export async function POST(
       applicationId: application.id,
       memberId: application.memberId,
       releasedAt: new Date(),
+      renewalFromLoanId: existingUnpaidLoan?.id ?? null,
+      renewalDeducted,
       amortizationSchedule: {
         create: scheduleRows.map((row, i) => ({
           dueDate: row.dueDate,
@@ -87,6 +120,13 @@ export async function POST(
     },
     include: { amortizationSchedule: true },
   })
+
+  if (existingUnpaidLoan && renewalDeducted > 0) {
+    await prisma.loan.update({
+      where: { id: existingUnpaidLoan.id },
+      data: { status: "RENEWED", outstandingBalance: 0 },
+    })
+  }
 
   const userId = session.user.id
   await prisma.loanApplication.update({

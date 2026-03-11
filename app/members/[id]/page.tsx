@@ -7,7 +7,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { ModuleHeader } from "@/components/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -81,9 +81,10 @@ export default async function MemberDetailPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Member profile</CardTitle>
-            <Badge variant={goodStanding ? "default" : "secondary"}>
-              {goodStanding ? "Good standing" : "Not eligible for loans"}
-            </Badge>
+            <StatusBadge
+              status={goodStanding ? "GOOD_STANDING" : "NOT_ELIGIBLE"}
+              label={goodStanding ? "Good standing" : "Not eligible for loans"}
+            />
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -208,17 +209,7 @@ export default async function MemberDetailPage({
                           ₱{loan.outstandingBalance.toLocaleString("en-PH")}
                         </td>
                         <td className="px-3 py-1.5">
-                          <Badge
-                            variant={
-                              loan.status === "ACTIVE"
-                                ? "default"
-                                : loan.status === "DELINQUENT"
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {loan.status}
-                          </Badge>
+                          <StatusBadge status={loan.status} />
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <Button variant="action" size="icon-sm" asChild title="View">

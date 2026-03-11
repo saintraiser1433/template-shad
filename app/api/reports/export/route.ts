@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { formatDate } from "@/lib/date-format"
 import * as XLSX from "xlsx"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
         "Principal": l.principalAmount,
         "Outstanding": l.outstandingBalance,
         "Status": l.status,
-        "Released At": l.releasedAt ? new Date(l.releasedAt).toLocaleDateString() : "",
+        "Released At": l.releasedAt ? formatDate(l.releasedAt) : "",
       }))
       if (format === "xlsx") {
         return excelResponse(rows, "Loans Report")
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
         },
       })
       const rows = payments.map((p) => ({
-        "Date": new Date(p.paymentDate).toLocaleDateString(),
+        "Date": formatDate(p.paymentDate),
         "Loan No": p.loan.loanNo,
         "Member No": p.loan.member.memberNo,
         "Member Name": p.loan.member.name,

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ModuleHeader } from "@/components/module-header"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
@@ -18,6 +17,8 @@ import {
 } from "@/components/ui/breadcrumb"
 import { CreateLoanFromApplication } from "@/components/create-loan-from-application"
 import { UpdateApplicationStatus } from "@/components/update-application-status"
+import { ViewRemarksButton } from "@/components/view-remarks-button"
+import { RoleActionHistoryTable } from "../role-action-history-table"
 
 export default async function LoansForFundingPage({
   searchParams,
@@ -112,6 +113,7 @@ export default async function LoansForFundingPage({
                     <th className="px-3 py-1.5 text-left font-medium">Committee who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Board who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Remarks</th>
                     <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -119,7 +121,7 @@ export default async function LoansForFundingPage({
                   {applications.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         className="px-3 py-10"
                       >
                         <EmptyState
@@ -164,8 +166,20 @@ export default async function LoansForFundingPage({
                         <td className="px-3 py-1.5 text-muted-foreground">
                           {app.fundedBy?.name ?? "—"}
                         </td>
+                        <td className="px-3 py-1.5">
+                          <ViewRemarksButton
+                            applicationNo={app.applicationNo}
+                            remarks={app.approvalRemarks}
+                            label="View"
+                            size="sm"
+                          />
+                        </td>
                         <td className="px-3 py-1.5 text-right flex gap-2 justify-end">
-                          <CreateLoanFromApplication applicationId={app.id} />
+                          <CreateLoanFromApplication
+                            applicationId={app.id}
+                            applicationNo={app.applicationNo}
+                            memberName={app.member.name}
+                          />
                           <UpdateApplicationStatus
                             applicationId={app.id}
                             currentStatus={app.status}
@@ -182,6 +196,8 @@ export default async function LoansForFundingPage({
             </div>
           </CardContent>
         </Card>
+
+        <RoleActionHistoryTable historyType="finance" />
       </div>
     </DashboardLayout>
   )

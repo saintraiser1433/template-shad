@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ModuleHeader } from "@/components/module-header"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
@@ -17,6 +17,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { ApprovalApplicationActions } from "@/components/approval-application-actions"
+import { ViewRemarksButton } from "@/components/view-remarks-button"
+import { RoleActionHistoryTable } from "../role-action-history-table"
 
 const APPROVAL_STATUS_BY_ROLE: Record<string, string[]> = {
   MANAGER: ["MANAGER_REVIEW"],
@@ -119,6 +121,7 @@ export default async function LoansForApprovalPage({
                     <th className="px-3 py-1.5 text-left font-medium">Committee who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Board who approved</th>
                     <th className="px-3 py-1.5 text-left font-medium">Finance Officer who approved</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Remarks</th>
                     <th className="px-3 py-1.5 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -126,7 +129,7 @@ export default async function LoansForApprovalPage({
                   {applications.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="px-3 py-10"
                       >
                         <EmptyState
@@ -157,7 +160,7 @@ export default async function LoansForApprovalPage({
                           ₱{app.amount.toLocaleString("en-PH")}
                         </td>
                         <td className="px-3 py-1.5">
-                          <Badge variant="secondary">{app.status}</Badge>
+                          <StatusBadge status={app.status} />
                         </td>
                         <td className="px-3 py-1.5 text-muted-foreground">
                           {app.cibiApprovedBy?.name ?? "—"}
@@ -173,6 +176,14 @@ export default async function LoansForApprovalPage({
                         </td>
                         <td className="px-3 py-1.5 text-muted-foreground">
                           {app.fundedBy?.name ?? "—"}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <ViewRemarksButton
+                            applicationNo={app.applicationNo}
+                            remarks={app.approvalRemarks}
+                            label="View"
+                            size="sm"
+                          />
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <ApprovalApplicationActions
@@ -201,6 +212,18 @@ export default async function LoansForApprovalPage({
             </div>
           </CardContent>
         </Card>
+
+        <RoleActionHistoryTable
+          historyType={
+            role === "MANAGER"
+              ? "manager"
+              : role === "CREDIT_COMMITTEE"
+                ? "committee"
+                : role === "BOARD_OF_DIRECTORS"
+                  ? "board"
+                  : "all"
+          }
+        />
       </div>
     </DashboardLayout>
   )

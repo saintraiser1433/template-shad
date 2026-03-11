@@ -6,12 +6,14 @@ import { prisma } from "@/lib/prisma"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ModuleHeader } from "@/components/module-header"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
-import { TablePagination } from "@/components/ui/table-pagination"
 import { TableSearchForm } from "@/components/table-search-form"
 import { EmptyState } from "@/components/empty-state"
 import { MemberApplicationsTable } from "./member-applications-table"
+import { LoansPagination } from "./loans-pagination"
+import { StatusTabs } from "./status-tabs"
+import { ApplicationStatusTabs } from "./application-status-tabs"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,16 +23,40 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 
+const LOAN_STATUSES = ["ACTIVE", "PAID", "DELINQUENT", "RENEWED"] as const
+const APPLICATION_STATUSES = [
+  "PENDING", "CIBI_REVIEW", "MANAGER_REVIEW", "COMMITTEE_REVIEW",
+  "BOARD_REVIEW", "APPROVED", "REJECTED", "FUNDED", "RELEASED",
+] as const
+const PAGE_SIZES = [10, 25, 50]
+const DEFAULT_PAGE_SIZE = 10
+
+function clampPageSize(size: number): number {
+  const n = Number(size) || DEFAULT_PAGE_SIZE
+  return PAGE_SIZES.includes(n) ? n : DEFAULT_PAGE_SIZE
+}
+
 export default async function LoansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>
+  searchParams: Promise<{ search?: string; status?: string; page?: string; size?: string; appPage?: string; appSize?: string; appStatus?: string }>
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
 
-  const { search } = await searchParams
-  const q = search?.trim()
+  const params = await searchParams
+  const q = params.search?.trim()
+  const statusFilter = params.status?.toUpperCase()
+  const validStatus = statusFilter && LOAN_STATUSES.includes(statusFilter as (typeof LOAN_STATUSES)[number]) ? statusFilter : null
+  const page = Math.max(1, Number(params.page) || 1)
+  const size = clampPageSize(Number(params.size) || DEFAULT_PAGE_SIZE)
+  const appPage = Math.max(1, Number(params.appPage) || 1)
+  const appSize = clampPageSize(Number(params.appSize) || DEFAULT_PAGE_SIZE)
+  const appStatusParam = params.appStatus?.toUpperCase()
+  const validAppStatus =
+    appStatusParam && APPLICATION_STATUSES.includes(appStatusParam as (typeof APPLICATION_STATUSES)[number])
+      ? appStatusParam
+      : null
   const isMember = session.user.role === "MEMBER"
 
   let memberIdFilter: string | undefined
@@ -42,51 +68,68 @@ export default async function LoansPage({
     if (member) memberIdFilter = member.id
   }
 
-  const loans = await prisma.loan.findMany({
-    where: {
-      ...(memberIdFilter ? { memberId: memberIdFilter } : {}),
-      ...(q
-        ? {
-            OR: [
-              { loanNo: { contains: q, mode: "insensitive" } },
-              { member: { name: { contains: q, mode: "insensitive" } } },
-              { member: { memberNo: { contains: q, mode: "insensitive" } } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      member: { select: { id: true, memberNo: true, name: true } },
-      application: {
-        select: {
-          cibiApprovedBy: { select: { name: true } },
-          managerApprovedBy: { select: { name: true } },
-          committeeApprovedBy: { select: { name: true } },
-          boardApprovedBy: { select: { name: true } },
-          fundedBy: { select: { name: true } },
-        },
-      },
-      amortizationSchedule: {
-        select: { isPaid: true },
-      },
-    },
-  })
+  const loansWhere = {
+    ...(memberIdFilter ? { memberId: memberIdFilter } : {}),
+    ...(validStatus ? { status: validStatus } : {}),
+    ...(q
+      ? {
+          OR: [
+            { loanNo: { contains: q, mode: "insensitive" } },
+            { member: { name: { contains: q, mode: "insensitive" } } },
+            { member: { memberNo: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  }
 
-  const applications = memberIdFilter
-    ? await prisma.loanApplication.findMany({
-        where: { memberId: memberIdFilter },
-        orderBy: { createdAt: "desc" },
-        include: {
-          loanProduct: { select: { name: true } },
-          cibiApprovedBy: { select: { name: true } },
-          managerApprovedBy: { select: { name: true } },
-          committeeApprovedBy: { select: { name: true } },
-          boardApprovedBy: { select: { name: true } },
-          fundedBy: { select: { name: true } },
+  const [loansTotal, loans] = await Promise.all([
+    prisma.loan.count({ where: loansWhere }),
+    prisma.loan.findMany({
+      where: loansWhere,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * size,
+      take: size,
+      include: {
+        member: { select: { id: true, memberNo: true, name: true } },
+        application: {
+          select: {
+            cibiApprovedBy: { select: { name: true } },
+            managerApprovedBy: { select: { name: true } },
+            committeeApprovedBy: { select: { name: true } },
+            boardApprovedBy: { select: { name: true } },
+            fundedBy: { select: { name: true } },
+          },
         },
-      })
-    : []
+        amortizationSchedule: {
+          select: { isPaid: true },
+        },
+      },
+    }),
+  ])
+
+  const applicationsWhere = {
+    memberId: memberIdFilter!,
+    ...(validAppStatus ? { status: validAppStatus } : {}),
+  }
+  const [applicationsTotal, applications] = memberIdFilter
+    ? await Promise.all([
+        prisma.loanApplication.count({ where: applicationsWhere }),
+        prisma.loanApplication.findMany({
+          where: applicationsWhere,
+          orderBy: { createdAt: "desc" },
+          skip: (appPage - 1) * appSize,
+          take: appSize,
+          include: {
+            loanProduct: { select: { name: true } },
+            cibiApprovedBy: { select: { name: true } },
+            managerApprovedBy: { select: { name: true } },
+            committeeApprovedBy: { select: { name: true } },
+            boardApprovedBy: { select: { name: true } },
+            fundedBy: { select: { name: true } },
+          },
+        }),
+      ])
+    : [0, []]
 
   return (
     <DashboardLayout>
@@ -113,12 +156,17 @@ export default async function LoansPage({
           </p>
         </div>
         <Card>
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
-            <TableSearchForm
-              basePath="/loans"
-              defaultSearch={search}
-              placeholder="Search loan no or member..."
-            />
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+              <TableSearchForm
+                basePath="/loans"
+                defaultSearch={params.search}
+                placeholder="Search loan no or member..."
+              />
+            </div>
+            <div className="flex flex-wrap gap-1 border-b border-border">
+              <StatusTabs current={validStatus} search={params.search} size={size} />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -156,7 +204,8 @@ export default async function LoansPage({
                   ) : (
                     loans.map((loan) => {
                       const isLoanFullyPaid =
-                        loan.outstandingBalance <= 0 &&
+                        loan.outstandingBalance < 0.01 &&
+                        loan.amortizationSchedule.length > 0 &&
                         loan.amortizationSchedule.every((row) => row.isPaid)
                       const displayStatus =
                         isLoanFullyPaid && loan.status !== "PAID" ? "PAID" : loan.status
@@ -178,19 +227,9 @@ export default async function LoansPage({
                           <td className="px-3 py-1.5">
                             ₱{loan.outstandingBalance.toLocaleString("en-PH")}
                           </td>
-                          <td className="px-3 py-1.5">
-                            <Badge
-                              variant={
-                                displayStatus === "ACTIVE"
-                                  ? "default"
-                                  : displayStatus === "DELINQUENT"
-                                    ? "destructive"
-                                    : "secondary"
-                              }
-                            >
-                              {displayStatus}
-                            </Badge>
-                          </td>
+                        <td className="px-3 py-1.5">
+                          <StatusBadge status={displayStatus} />
+                        </td>
                           <td className="px-3 py-1.5 text-muted-foreground">
                             {loan.application?.cibiApprovedBy?.name ?? "—"}
                           </td>
@@ -221,20 +260,21 @@ export default async function LoansPage({
               </table>
             </div>
             <div className="mt-2 flex justify-end">
-              <TablePagination totalItems={loans.length} />
+              <LoansPagination totalItems={loansTotal} />
             </div>
           </CardContent>
         </Card>
 
         {memberIdFilter && (
           <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+            <CardHeader className="flex flex-col gap-4">
               <div className="space-y-1">
                 <h2 className="text-sm font-semibold">Loan applications</h2>
                 <p className="text-xs text-muted-foreground">
                   Your submitted loan requests and their approval status.
                 </p>
               </div>
+              <ApplicationStatusTabs current={validAppStatus} />
             </CardHeader>
             <CardContent>
               <MemberApplicationsTable
@@ -245,6 +285,7 @@ export default async function LoansPage({
                   amount: app.amount,
                   status: app.status,
                   rejectionReason: app.rejectionReason ?? null,
+                  approvalRemarks: app.approvalRemarks ?? null,
                   cibiApprovedByName: app.cibiApprovedBy?.name ?? null,
                   managerApprovedByName: app.managerApprovedBy?.name ?? null,
                   committeeApprovedByName: app.committeeApprovedBy?.name ?? null,
@@ -252,6 +293,13 @@ export default async function LoansPage({
                   fundedByName: app.fundedBy?.name ?? null,
                 }))}
               />
+              <div className="mt-2 flex justify-end">
+                <LoansPagination
+                  totalItems={applicationsTotal}
+                  pageParam="appPage"
+                  sizeParam="appSize"
+                />
+              </div>
             </CardContent>
           </Card>
         )}

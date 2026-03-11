@@ -2,12 +2,12 @@
 
 import Link from "next/link"
 import { useSession } from "next-auth/react"
+import Image from "next/image"
 import {
   LayoutDashboard,
   Users,
   UserCircle,
   Wallet,
-  Banknote,
   FileText,
   Scale,
   FileCheck,
@@ -29,60 +29,30 @@ import {
 
 const memberNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  {
-    title: "Loans",
-    url: "/loans",
-    icon: Wallet,
-    items: [
-      { title: "Apply for Loan", url: "/loans/apply" },
-      { title: "My Loans", url: "/loans" },
-    ],
-  },
+  { title: "Apply for Loan", url: "/loans/apply", icon: Wallet },
+  { title: "My Loans", url: "/loans", icon: Wallet },
 ]
 
 const collectorNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  {
-    title: "Loans",
-    url: "/loans/pending",
-    icon: Wallet,
-    items: [{ title: "Pending CI/BI", url: "/loans/pending" }],
-  },
+  { title: "Pending CI/BI", url: "/loans/pending", icon: Wallet },
 ]
 
 const managerNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  {
-    title: "Loans",
-    url: "/loans/for-approval",
-    icon: Wallet,
-    items: [{ title: "For Approval", url: "/loans/for-approval" }],
-  },
+  { title: "For Approval", url: "/loans/for-approval", icon: Wallet },
   { title: "Reports", url: "/reports", icon: FileText },
 ]
 
 const committeeNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  {
-    title: "Loans",
-    url: "/loans/for-approval",
-    icon: Wallet,
-    items: [{ title: "For Approval", url: "/loans/for-approval" }],
-  },
+  { title: "For Approval", url: "/loans/for-approval", icon: Wallet },
 ]
 
 const financeNavMain = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  {
-    title: "Loans",
-    url: "/loans",
-    icon: Wallet,
-    items: [
-      { title: "All Loans", url: "/loans" },
-      { title: "For Funding", url: "/loans/for-funding" },
-    ],
-  },
-  { title: "Payments", url: "/payments", icon: Banknote },
+  { title: "All Loans", url: "/loans", icon: Wallet },
+  { title: "For Funding", url: "/loans/for-funding", icon: Wallet },
 ]
 
 const adminNavMain = [
@@ -90,22 +60,15 @@ const adminNavMain = [
   { title: "Users", url: "/users", icon: Users },
   { title: "Members", url: "/members", icon: UserCircle },
   { title: "Activity log", url: "/admin/activity-log", icon: ScrollText },
-  {
-    title: "Loans",
-    url: "/loans",
-    icon: Wallet,
-    items: [
-      { title: "All Loans", url: "/loans" },
-      { title: "Pending CI/BI", url: "/loans/pending" },
-      { title: "For Approval", url: "/loans/for-approval" },
-      { title: "For Funding", url: "/loans/for-funding" },
-      { title: "Type of Loans", url: "/loan-types" },
-    ],
-  },
+  { title: "All Loans", url: "/loans", icon: Wallet },
+  { title: "Pending CI/BI", url: "/loans/pending", icon: Wallet },
+  { title: "For Approval", url: "/loans/for-approval", icon: Wallet },
+  { title: "For Funding", url: "/loans/for-funding", icon: Wallet },
+  { title: "Type of Loans", url: "/loan-types", icon: Wallet },
   { title: "Requirements", url: "/requirements", icon: FileCheck },
   { title: "Payment methods", url: "/payment-methods", icon: CreditCard },
-  { title: "Payments", url: "/payments", icon: Banknote },
   { title: "Reports", url: "/reports", icon: FileText },
+  { title: "SMS settings", url: "/admin/sms-settings", icon: Scale },
 ]
 
 function getNavForRole(role: string | undefined) {
@@ -143,8 +106,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Scale className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-white">
+                  <Image
+                    src="/logo.png"
+                    alt="MCFMP Cooperative logo"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                    priority
+                  />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">MCFMP-CMLMS</span>

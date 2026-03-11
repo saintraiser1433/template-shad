@@ -7,7 +7,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { ModuleHeader } from "@/components/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,6 +23,8 @@ import { ViewPaymentDetailsButton } from "./view-payment-details"
 import { CreateVoucherModal } from "./create-voucher-modal"
 import { ViewVoucherModal } from "./view-voucher-modal"
 import { SchedulePaymentsButton } from "./schedule-payments-button"
+import { ViewPaymentReceiptButton } from "./view-payment-receipt-button"
+import { formatDate } from "@/lib/date-format"
 
 export default async function LoanDetailPage({
   params,
@@ -52,6 +54,8 @@ export default async function LoanDetailPage({
         },
       },
       voucher: true,
+      voucherIssuedBy: { select: { name: true } },
+      passbookIssuedBy: { select: { name: true } },
       amortizationSchedule: { orderBy: { sequence: "asc" } },
       payments: {
         orderBy: { paymentDate: "desc" },
@@ -60,6 +64,7 @@ export default async function LoanDetailPage({
           amortizationSchedule: {
             select: { id: true, sequence: true, dueDate: true },
           },
+          approvedBy: { select: { name: true } },
         },
       },
     },
@@ -73,8 +78,10 @@ export default async function LoanDetailPage({
     loan.member.userId === sessionUserId
   const canRecordPayment = isFinanceOfficer || isOwnLoan
 
+  // Use small epsilon for balance so rounding (e.g. 0.002) still counts as fully paid
   const isLoanFullyPaid =
-    loan.outstandingBalance <= 0 &&
+    loan.outstandingBalance < 0.01 &&
+    loan.amortizationSchedule.length > 0 &&
     loan.amortizationSchedule.every((row) => row.isPaid)
 
   const displayStatus =
@@ -114,6 +121,7 @@ export default async function LoanDetailPage({
       paymentMethod: string | null
       remarks: string | null
       referenceNo: string | null
+      approvedByName: string | null
     }[]
   >()
   loan.payments.forEach((p) => {
@@ -125,6 +133,8 @@ export default async function LoanDetailPage({
     const remarks = (p as { remarks?: string | null }).remarks ?? null
     const referenceNo =
       (p as { referenceNo?: string | null }).referenceNo ?? null
+    const approvedByName =
+      (p as { approvedBy?: { name: string } | null }).approvedBy?.name ?? null
     const arr = paymentsByScheduleId.get(scheduleId) ?? []
     arr.push({
       id: p.id,
@@ -137,6 +147,7 @@ export default async function LoanDetailPage({
       paymentMethod,
       remarks,
       referenceNo,
+      approvedByName,
     })
     paymentsByScheduleId.set(scheduleId, arr)
   })
@@ -209,17 +220,7 @@ export default async function LoanDetailPage({
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Loan details</CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant={
-                  displayStatus === "ACTIVE"
-                    ? "default"
-                    : displayStatus === "DELINQUENT"
-                      ? "destructive"
-                      : "secondary"
-                }
-              >
-                {displayStatus}
-              </Badge>
+              <StatusBadge status={displayStatus} />
               {isOwnLoan && (
                 <Button
                   asChild
@@ -235,26 +236,33 @@ export default async function LoanDetailPage({
               )}
               {(displayStatus === "ACTIVE" || displayStatus === "DELINQUENT") &&
                 !isLoanFullyPaid &&
-                canRecordPayment && (
+                canRecordPayment &&
+                // Members should only pay via the amortization schedule rows (not the header button).
+                !isOwnLoan && (
                   <RecordPaymentButton
                     loanId={loan.id}
-                    showLabel={isOwnLoan}
+                    showLabel={false}
                     outstandingBalance={loan.outstandingBalance}
                     isFinanceOfficer={isFinanceOfficer}
-                    disabled={isOwnLoan && hasPendingApprovalPayment}
-                    disabledReason={
-                      isOwnLoan && hasPendingApprovalPayment
-                        ? "You already have a payment pending approval. Please wait for finance to approve or reject it before making another payment."
-                        : undefined
-                    }
                   />
                 )}
-              {canManageVoucher &&
+              {(canManageVoucher || isOwnLoan) &&
                 (loan.voucher ? (
                   <ViewVoucherModal
                     loanId={loan.id}
                     loanNo={loan.loanNo}
                     memberLabel={`${loan.member.name} (${loan.member.memberNo})`}
+                    buttonLabel={isOwnLoan ? "Check voucher" : undefined}
+                    renewal={
+                      loan.renewalDeducted > 0.01
+                        ? {
+                            requestedAmount: loan.principalAmount + loan.renewalDeducted,
+                            deducted: loan.renewalDeducted,
+                            reason:
+                              "This is a loan renewal. The remaining balance from your previous loan was deducted.",
+                          }
+                        : undefined
+                    }
                     voucher={{
                       voucherNo: loan.voucher.voucherNo,
                       releaseMethod: loan.voucher.releaseMethod,
@@ -263,7 +271,9 @@ export default async function LoanDetailPage({
                     }}
                   />
                 ) : (
-                  <CreateVoucherModal loanId={loan.id} loanNo={loan.loanNo} hideReleaseMethod />
+                  canManageVoucher && (
+                    <CreateVoucherModal loanId={loan.id} loanNo={loan.loanNo} hideReleaseMethod />
+                  )
                 ))}
             </div>
           </CardHeader>
@@ -330,6 +340,30 @@ export default async function LoanDetailPage({
                   </p>
                 </div>
               )}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Voucher issued
+                </p>
+                <p className="font-medium">
+                  {loan.voucherIssuedAt
+                    ? `${formatDate(loan.voucherIssuedAt)} · ${
+                        loan.voucherIssuedBy?.name ?? "—"
+                      }`
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Passbook issued
+                </p>
+                <p className="font-medium">
+                  {loan.passbookIssuedAt
+                    ? `${formatDate(loan.passbookIssuedAt)} · ${
+                        loan.passbookIssuedBy?.name ?? "—"
+                      }`
+                    : "—"}
+                </p>
+              </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Type</p>
                 <p className="font-medium">
@@ -405,6 +439,13 @@ export default async function LoanDetailPage({
                 </>
               )}
             </div>
+            {isOwnLoan && (
+              <p className="text-sm text-muted-foreground">
+                Bring your <span className="font-medium">loan voucher</span> and{" "}
+                <span className="font-medium">passbook</span> when paying in the
+                office for payment validation.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -429,8 +470,7 @@ export default async function LoanDetailPage({
                         const hasPendingForRow = rowPayments.some(
                           (p) => p.status === "PENDING_APPROVAL",
                         )
-                        const memberBlockedByOrder =
-                          isOwnLoan &&
+                        const blockedByOrder =
                           earliestUnpaidScheduleId != null &&
                           !row.isPaid &&
                           row.id !== earliestUnpaidScheduleId
@@ -451,20 +491,18 @@ export default async function LoanDetailPage({
                                 outstandingBalance={loan.outstandingBalance}
                                 isFinanceOfficer={isFinanceOfficer}
                                 scheduleRowId={row.id}
-                                disabled={isOwnLoan && (hasPendingForRow || memberBlockedByOrder)}
+                                disabled={hasPendingForRow || blockedByOrder}
                                 disabledReason={
-                                  isOwnLoan && hasPendingForRow
-                                    ? "You already submitted a payment for this schedule that is pending approval."
-                                    : isOwnLoan && memberBlockedByOrder
+                                  hasPendingForRow
+                                    ? "There is already a payment for this schedule pending approval."
+                                    : blockedByOrder
                                       ? "You must fully pay earlier months before paying this schedule."
                                       : undefined
                                 }
                               />
                             )}
                           <SchedulePaymentsButton
-                            scheduleLabel={`#${row.sequence} (${new Date(
-                              row.dueDate,
-                            ).toLocaleDateString("en-PH")})`}
+                            scheduleLabel={`#${row.sequence} (${formatDate(row.dueDate)})`}
                             payments={(paymentsByScheduleId.get(row.id) ?? []).map(
                               (p) => ({
                                 id: p.id,
@@ -477,6 +515,8 @@ export default async function LoanDetailPage({
                                 paymentMethod: p.paymentMethod,
                                 remarks: p.remarks,
                                 referenceNo: p.referenceNo,
+                                cbuAdded: cbuAddedByPaymentId.get(p.id) ?? 0,
+                                approvedByName: p.approvedByName,
                               }),
                             )}
                             loanId={loan.id}
@@ -521,14 +561,14 @@ export default async function LoanDetailPage({
                         Penalty
                       </th>
                       <th className="px-3 py-1.5 text-left font-medium">Status</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Approved by</th>
                       <th className="px-3 py-1.5 text-left font-medium">Schedule</th>
                       <th className="px-3 py-1.5 text-left font-medium">CBU added</th>
                       <th className="px-3 py-1.5 text-left font-medium">Reference #</th>
-                      {isFinanceOfficer && (
-                        <th className="px-3 py-1.5 text-left font-medium">
-                          Method
-                        </th>
-                      )}
+                      <th className="px-3 py-1.5 text-left font-medium">Receipt</th>
+                      <th className="px-3 py-1.5 text-left font-medium">
+                        Mode of payment
+                      </th>
                       {isFinanceOfficer && (
                         <th className="px-3 py-1.5 text-right font-medium">
                           Actions
@@ -557,7 +597,7 @@ export default async function LoanDetailPage({
                           className="border-b transition-colors hover:bg-muted/30"
                         >
                           <td className="px-3 py-1.5">
-                            {new Date(p.paymentDate).toLocaleDateString("en-PH")}
+                            {formatDate(p.paymentDate)}
                           </td>
                           <td className="px-3 py-1.5">
                             ₱{p.amount.toLocaleString("en-PH")}
@@ -572,18 +612,23 @@ export default async function LoanDetailPage({
                             ₱{p.penalty.toLocaleString("en-PH")}
                           </td>
                           <td className="px-3 py-1.5">
-                            <div>{status}</div>
-                            {status === "REJECTED" && remarks && (
+                            <div>
+                              <StatusBadge status={status} />
+                              {status === "REJECTED" && remarks && (
                               <div className="mt-0.5 text-[11px] text-muted-foreground">
                                 Reason: {remarks}
                               </div>
-                            )}
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {status === "APPROVED"
+                              ? (p as { approvedBy?: { name: string } | null }).approvedBy?.name ?? "—"
+                              : "—"}
                           </td>
                           <td className="px-3 py-1.5">
                             {sched
-                              ? `#${sched.sequence} (${new Date(
-                                  sched.dueDate as unknown as string,
-                                ).toLocaleDateString("en-PH")})`
+                              ? `#${sched.sequence} (${formatDate(sched.dueDate as unknown as string)})`
                               : "—"}
                           </td>
                           <td className="px-3 py-1.5">
@@ -592,11 +637,20 @@ export default async function LoanDetailPage({
                               : "—"}
                           </td>
                           <td className="px-3 py-1.5">{referenceNo ?? ""}</td>
-                          {isFinanceOfficer && (
-                            <td className="px-3 py-1.5">
-                              {paymentMethod || "CASH"}
-                            </td>
-                          )}
+                          <td className="px-3 py-1.5">
+                            {status === "APPROVED" ? (
+                              <ViewPaymentReceiptButton
+                                loanId={loan.id}
+                                paymentId={p.id}
+                                size="icon-sm"
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            {paymentMethod || "CASH"}
+                          </td>
                           {isFinanceOfficer && (
                             <td className="px-3 py-1.5 text-right">
                               {showViewDetails ? (

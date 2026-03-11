@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { formatDate } from "@/lib/date-format"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -10,7 +11,9 @@ import {
   AlertDialogTitle,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
+import { StatusBadge } from "@/components/status-badge"
 import { ViewPaymentDetailsButton } from "./view-payment-details"
+import { ViewPaymentReceiptButton } from "./view-payment-receipt-button"
 
 type SchedulePayment = {
   id: string
@@ -23,6 +26,8 @@ type SchedulePayment = {
   paymentMethod: string | null
   remarks: string | null
   referenceNo: string | null
+  cbuAdded: number
+  approvedByName?: string | null
 }
 
 export function SchedulePaymentsButton({
@@ -50,33 +55,32 @@ export function SchedulePaymentsButton({
         $
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent className="max-w-2xl">
+        <AlertDialogContent className="w-[98vw] max-w-7xl sm:w-full">
           <AlertDialogHeader>
             <AlertDialogTitle>Payments for {scheduleLabel}</AlertDialogTitle>
           </AlertDialogHeader>
-          <div className="mt-2 max-h-80 overflow-y-auto text-xs">
+          <div className="mt-2 max-h-[60vh] min-h-0 overflow-auto text-xs sm:max-h-[70vh]">
             {payments.length === 0 ? (
               <p className="text-muted-foreground">
                 No payments for this schedule yet.
               </p>
             ) : (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b bg-muted/40">
-                    <th className="px-2 py-1 text-left font-medium">Date</th>
-                    <th className="px-2 py-1 text-left font-medium">Amount</th>
-                    <th className="px-2 py-1 text-left font-medium">Principal</th>
-                    <th className="px-2 py-1 text-left font-medium">Interest</th>
-                    <th className="px-2 py-1 text-left font-medium">Penalty</th>
-                    <th className="px-2 py-1 text-left font-medium">Method</th>
-                    <th className="px-2 py-1 text-left font-medium">Status</th>
-                    <th className="px-2 py-1 text-left font-medium">Reference #</th>
-                    {isFinanceOfficer && (
-                      <th className="px-2 py-1 text-right font-medium">Actions</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full min-w-[520px] text-xs">
+                  <thead>
+                    <tr className="border-b bg-muted/40">
+                      <th className="px-2 py-1 text-left font-medium">Date</th>
+                      <th className="px-2 py-1 text-right font-medium">Amount</th>
+                      <th className="px-2 py-1 text-left font-medium">Mode</th>
+                      <th className="px-2 py-1 text-left font-medium">Status</th>
+                      <th className="px-2 py-1 text-left font-medium">Approved by</th>
+                      <th className="px-2 py-1 text-left font-medium">Receipt</th>
+                      {isFinanceOfficer && (
+                        <th className="px-2 py-1 text-right font-medium">Actions</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
                   {payments.map((p) => {
                     const showViewDetails =
                       isFinanceOfficer &&
@@ -86,27 +90,28 @@ export function SchedulePaymentsButton({
                     return (
                       <tr key={p.id} className="border-b last:border-0">
                         <td className="px-2 py-1">
-                          {new Date(p.paymentDate).toLocaleDateString("en-PH")}
+                          {formatDate(p.paymentDate)}
                         </td>
-                        <td className="px-2 py-1">
+                        <td className="px-2 py-1 text-right">
                           ₱{p.amount.toLocaleString("en-PH")}
                         </td>
                         <td className="px-2 py-1">
-                          ₱{p.principal.toLocaleString("en-PH")}
+                          {p.paymentMethod ?? "CASH"}
                         </td>
                         <td className="px-2 py-1">
-                          ₱{p.interest.toLocaleString("en-PH")}
-                        </td>
-                        <td className="px-2 py-1">
-                          ₱{p.penalty.toLocaleString("en-PH")}
-                        </td>
-                        <td className="px-2 py-1">{p.paymentMethod ?? "—"}</td>
-                        <td className="px-2 py-1">
-                          <div>{p.status}</div>
-                          {p.status === "REJECTED" && p.remarks && (
+                          <div>
+                            <StatusBadge status={p.status} />
+                            {p.status === "REJECTED" && p.remarks && (
                             expandedReasonId === p.id ? (
                               <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                {p.remarks}
+                                Reason: {p.remarks}{" "}
+                                <button
+                                  type="button"
+                                  className="underline"
+                                  onClick={() => setExpandedReasonId(null)}
+                                >
+                                  Hide
+                                </button>
                               </div>
                             ) : (
                               <button
@@ -117,9 +122,23 @@ export function SchedulePaymentsButton({
                                 View reason
                               </button>
                             )
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1 text-muted-foreground">
+                          {p.status === "APPROVED" ? (p.approvedByName ?? "—") : "—"}
+                        </td>
+                        <td className="px-2 py-1">
+                          {p.status === "APPROVED" ? (
+                            <ViewPaymentReceiptButton
+                              loanId={loanId}
+                              paymentId={p.id}
+                              size="icon-sm"
+                            />
+                          ) : (
+                            "—"
                           )}
                         </td>
-                        <td className="px-2 py-1">{p.referenceNo ?? ""}</td>
                         {isFinanceOfficer && (
                           <td className="px-2 py-1 text-right">
                             {showViewDetails ? (
@@ -144,8 +163,9 @@ export function SchedulePaymentsButton({
                       </tr>
                     )
                   })}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
           <AlertDialogFooter>

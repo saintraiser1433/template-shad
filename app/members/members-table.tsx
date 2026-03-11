@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Eye, Pencil } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { MembersSearchForm } from "./members-search-form"
 import { TablePagination } from "@/components/ui/table-pagination"
@@ -88,15 +88,10 @@ export function MembersTable({
                           ₱{m.cbu.toLocaleString("en-PH")}
                         </td>
                         <td className="px-3 py-1.5">
-                          <Badge
-                            variant={
-                              goodStanding ? "default" : "secondary"
-                            }
-                          >
-                            {goodStanding
-                              ? "Good standing"
-                              : "Not eligible"}
-                          </Badge>
+                          <StatusBadge
+                            status={goodStanding ? "GOOD_STANDING" : "NOT_ELIGIBLE"}
+                            label={goodStanding ? "Good standing" : "Not eligible"}
+                          />
                         </td>
                         <td className="px-3 py-1.5">
                           <MemberStatusButtons

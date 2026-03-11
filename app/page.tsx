@@ -1,22 +1,23 @@
 import Link from "next/link"
-import {
-  HandCoins,
-  Users,
-  FileCheck,
-  Shield,
-  ArrowRight,
-  Scale,
-} from "lucide-react"
+import Image from "next/image"
+import { HandCoins, Users, FileCheck, Shield, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function LandingPage() {
   return (
     <div className="min-h-svh bg-gradient-to-b from-background to-muted/30">
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        <div className="container flex h-16 items-center justify-between px-4">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2 font-semibold">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Scale className="size-5" />
+            <div className="flex size-9 items-center justify-center rounded-full bg-white">
+              <Image
+                src="/logo.png"
+                alt="MCFMP Cooperative logo"
+                width={36}
+                height={36}
+                className="rounded-full"
+                priority
+              />
             </div>
             <span className="text-lg">MCFMP-CMLMS</span>
           </div>
@@ -34,7 +35,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className="container px-4 py-16 md:py-24">
+      <main className="container mx-auto px-4 py-16 md:py-24">
         <section className="mx-auto max-w-3xl text-center">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             Muslim Christian Fisherfolks
@@ -129,7 +130,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="mt-24 border-t border-border/50 py-8">
-        <div className="container px-4 text-center text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           MCFMP-CMLMS — Muslim Christian Fisherfolks Multi-Purpose Cooperative
           Money Lending and Management System
         </div>

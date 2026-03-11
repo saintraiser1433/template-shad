@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { createActivityLog } from "@/lib/activity-log"
 import { z } from "zod"
 
 const patchSchema = z.object({
@@ -38,6 +39,7 @@ export async function PATCH(
     include: {
       loan: {
         include: {
+          member: { select: { userId: true, name: true, memberNo: true } },
           amortizationSchedule: { orderBy: { sequence: "asc" } },
           application: {
             include: { loanProduct: true },
@@ -65,6 +67,29 @@ export async function PATCH(
         remarks: reason || null,
       },
     })
+    const amountStr = `₱${payment.amount.toLocaleString("en-PH")}`
+    await createActivityLog({
+      userId: session.user.id,
+      action: "PAYMENT_REJECTED",
+      entityType: "Payment",
+      entityId: paymentId,
+      details: `Loan ${payment.loan.loanNo} · ${amountStr}${reason ? ` · Reason: ${reason.slice(0, 150)}` : ""}`,
+    })
+    // Notify member that their payment was rejected (with reason)
+    const memberUserId = payment.loan.member?.userId
+    if (memberUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: memberUserId,
+          title: "Payment rejected",
+          message: reason
+            ? `Your payment of ${amountStr} for loan ${payment.loan.loanNo} was rejected. Reason: ${reason}`
+            : `Your payment of ${amountStr} for loan ${payment.loan.loanNo} was rejected by finance.`,
+          type: "PAYMENT_REJECTED",
+          link: `/loans/${loanId}`,
+        },
+      })
+    }
     return NextResponse.json({ ok: true, status: "REJECTED", rejectionReason: reason })
   }
 
@@ -165,9 +190,32 @@ export async function PATCH(
         interest: interestApplied,
         penalty: penaltyApplied,
         status: "APPROVED",
+        approvedById: session.user.id,
       },
     }),
   ])
+
+  const amountStr = `₱${payment.amount.toLocaleString("en-PH")}`
+  await createActivityLog({
+    userId: session.user.id,
+    action: "PAYMENT_APPROVED",
+    entityType: "Payment",
+    entityId: paymentId,
+    details: `Loan ${payment.loan.loanNo} · ${amountStr}`,
+  })
+  // Notify member that their payment was approved
+  const memberUserId = payment.loan.member?.userId
+  if (memberUserId) {
+    await prisma.notification.create({
+      data: {
+        userId: memberUserId,
+        title: "Payment approved",
+        message: `Your payment of ${amountStr} for loan ${payment.loan.loanNo} has been approved by finance.`,
+        type: "PAYMENT_APPROVED",
+        link: `/loans/${loanId}`,
+      },
+    })
+  }
 
   return NextResponse.json({ ok: true, status: "APPROVED" })
 }

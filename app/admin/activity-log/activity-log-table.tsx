@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { EmptyState } from "@/components/empty-state"
+import { formatDate } from "@/lib/date-format"
 
 const ACTION_OPTIONS = [
   { value: "all", label: "All actions" },
@@ -29,12 +30,38 @@ const ACTION_OPTIONS = [
   { value: "REQUIREMENT_UPDATED", label: "Requirement updated" },
   { value: "REQUIREMENT_DELETED", label: "Requirement deleted" },
   { value: "APPLICATION_STATUS_CHANGED", label: "Application status changed" },
+  { value: "APP_CIBI_APPROVED", label: "Collector: CI/BI approved" },
+  { value: "APP_CIBI_REJECTED", label: "Collector: CI/BI rejected" },
+  { value: "APP_MANAGER_APPROVED", label: "Manager: Approved" },
+  { value: "APP_MANAGER_REJECTED", label: "Manager: Rejected" },
+  { value: "APP_MANAGER_ENDORSED", label: "Manager: Endorsed to committee" },
+  { value: "APP_COMMITTEE_ENDORSED", label: "Committee: Endorsed to board" },
+  { value: "APP_COMMITTEE_REJECTED", label: "Committee: Rejected" },
+  { value: "APP_BOARD_APPROVED", label: "Board: Approved" },
+  { value: "APP_BOARD_REJECTED", label: "Board: Rejected" },
+  { value: "APP_FUNDED", label: "Treasurer: Funded" },
+  { value: "APP_RELEASED", label: "Treasurer: Released" },
   { value: "LOAN_CREATED", label: "Loan created" },
   { value: "LOAN_FUNDED", label: "Loan funded" },
   { value: "LOAN_RELEASED", label: "Loan released" },
   { value: "PAYMENT_RECORDED", label: "Payment recorded" },
+  { value: "PAYMENT_APPROVED", label: "Payment approved" },
+  { value: "PAYMENT_REJECTED", label: "Payment rejected" },
   { value: "VOUCHER_CREATED", label: "Voucher created" },
   { value: "REPORT_EXPORTED", label: "Report exported" },
+]
+
+const ROLE_OPTIONS = [
+  { value: "all", label: "All roles" },
+  { value: "COLLECTOR", label: "Collector" },
+  { value: "MANAGER", label: "Manager" },
+  { value: "CREDIT_COMMITTEE", label: "Credit committee" },
+  { value: "BOARD_OF_DIRECTORS", label: "Board of directors" },
+  { value: "TREASURER", label: "Treasurer" },
+  { value: "ADMIN", label: "Admin" },
+  { value: "LOANS_CLERK", label: "Loans clerk" },
+  { value: "DISBURSING_STAFF", label: "Disbursing staff" },
+  { value: "CASHIER", label: "Cashier" },
 ]
 
 const ENTITY_OPTIONS = [
@@ -48,6 +75,16 @@ const ENTITY_OPTIONS = [
   { value: "Payment", label: "Payment" },
 ]
 
+function actionLabel(action: string): string {
+  const opt = ACTION_OPTIONS.find((o) => o.value === action)
+  return opt ? opt.label : action.replace(/_/g, " ")
+}
+
+function roleLabel(role: string): string {
+  const opt = ROLE_OPTIONS.find((o) => o.value === role)
+  return opt ? opt.label : role.replace(/_/g, " ")
+}
+
 type LogEntry = {
   id: string
   action: string
@@ -55,7 +92,7 @@ type LogEntry = {
   entityId: string | null
   details: string | null
   createdAt: string
-  user: { id: string; name: string | null; email: string } | null
+  user: { id: string; name: string | null; email: string; role?: string } | null
 }
 
 export function ActivityLogTable() {
@@ -64,6 +101,7 @@ export function ActivityLogTable() {
   const [page, setPage] = useState(1)
   const [actionFilter, setActionFilter] = useState("")
   const [entityFilter, setEntityFilter] = useState("")
+  const [roleFilter, setRoleFilter] = useState("")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -72,6 +110,7 @@ export function ActivityLogTable() {
     params.set("page", String(page))
     if (actionFilter) params.set("action", actionFilter)
     if (entityFilter) params.set("entityType", entityFilter)
+    if (roleFilter) params.set("role", roleFilter)
     fetch(`/api/activity-log?${params}`)
       .then((r) => r.json())
       .then((data) => {
@@ -80,7 +119,7 @@ export function ActivityLogTable() {
       })
       .catch(() => setLogs([]))
       .finally(() => setLoading(false))
-  }, [page, actionFilter, entityFilter])
+  }, [page, actionFilter, entityFilter, roleFilter])
 
   return (
     <Card>
@@ -116,6 +155,18 @@ export function ActivityLogTable() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={roleFilter || "all"} onValueChange={(v) => { setRoleFilter(v === "all" ? "" : v); setPage(1) }}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardHeader>
       <CardContent>
@@ -131,6 +182,7 @@ export function ActivityLogTable() {
                   <tr className="border-b bg-muted/50">
                     <th className="px-3 py-1.5 text-left font-medium">Time</th>
                     <th className="px-3 py-1.5 text-left font-medium">User</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Role</th>
                     <th className="px-3 py-1.5 text-left font-medium">Action</th>
                     <th className="px-3 py-1.5 text-left font-medium">Entity</th>
                     <th className="px-3 py-1.5 text-left font-medium">Details</th>
@@ -140,7 +192,7 @@ export function ActivityLogTable() {
                   {logs.map((log) => (
                     <tr key={log.id} className="border-b transition-colors hover:bg-muted/30">
                       <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
-                        {new Date(log.createdAt).toLocaleString()}
+                        {formatDate(log.createdAt)}
                       </td>
                       <td className="px-3 py-1.5">
                         {log.user ? (
@@ -151,8 +203,11 @@ export function ActivityLogTable() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
+                      <td className="px-3 py-1.5 text-muted-foreground">
+                        {log.user?.role ? roleLabel(log.user.role) : "—"}
+                      </td>
                       <td className="px-3 py-1.5 font-medium">
-                        {log.action.replace(/_/g, " ")}
+                        {actionLabel(log.action)}
                       </td>
                       <td className="px-3 py-1.5">
                         {log.entityType ?? "—"}

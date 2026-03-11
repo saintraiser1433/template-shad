@@ -5,6 +5,7 @@ import { z } from "zod"
 import type { LoanType } from "@prisma/client"
 import { LOAN_TYPE_CONFIG, getMaxAmountForLoanType } from "@/lib/loan-config"
 import { GOOD_STANDING_CBU_MIN } from "@/lib/loan-config"
+import { checkRenewalEligibility } from "@/lib/loan-calculator"
 
 const loanTypeEnum = z.enum([
   "MEMBERSHIP_LOAN",
@@ -90,15 +91,20 @@ export async function POST(req: NextRequest) {
       status: {
         in: ["ACTIVE", "DELINQUENT", "RENEWED"],
       },
-      // Treat loans with zero outstanding balance as effectively paid,
-      // even if their status was not updated in older records.
+      // Treat loans with near-zero outstanding balance as effectively paid
+      // (avoids rounding issues and status not yet updated).
       outstandingBalance: {
-        gt: 0,
+        gt: 0.01,
       },
     },
-    select: { loanNo: true, status: true },
+    select: { loanNo: true, status: true, principalAmount: true, outstandingBalance: true },
   })
   if (existingLoan) {
+    const amountPaid = Math.max(0, existingLoan.principalAmount - existingLoan.outstandingBalance)
+    const eligibleForRenewal = checkRenewalEligibility(amountPaid, existingLoan.principalAmount)
+    if (eligibleForRenewal) {
+      // Allow new application as a renewal. Balance will be deducted upon loan creation/release.
+    } else {
     return NextResponse.json(
       {
         error:
@@ -106,6 +112,7 @@ export async function POST(req: NextRequest) {
       },
       { status: 400 }
     )
+    }
   }
 
   // Enforce one active/pending loan application per member.

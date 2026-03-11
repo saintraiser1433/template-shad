@@ -128,7 +128,7 @@ export function MemberForm({
             <Input
               id="contactNo"
               {...register("contactNo")}
-              placeholder="09xxxxxxxxx"
+              placeholder="+63917xxxxxxx or 0917xxxxxxx"
             />
           </Field>
           <Field>

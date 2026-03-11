@@ -16,6 +16,21 @@ const createMemberSchema = z.object({
   password: z.string().min(6).optional(),
 })
 
+function normalizePhMobile(raw: string | undefined): string | null {
+  if (!raw) return null
+  const digits = raw.replace(/\D/g, "")
+  if (digits.startsWith("639") && digits.length === 12) {
+    return `+${digits}`
+  }
+  if (digits.startsWith("09") && digits.length === 11) {
+    return `+63${digits.slice(1)}`
+  }
+  if (digits.startsWith("9") && digits.length === 10) {
+    return `+639${digits}`
+  }
+  return null
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) {
@@ -87,12 +102,26 @@ export async function POST(req: NextRequest) {
       userId = user.id
     }
   }
+  const normalizedContact =
+    data.contactNo != null && data.contactNo.trim() !== ""
+      ? normalizePhMobile(data.contactNo)
+      : null
+  if (data.contactNo && !normalizedContact) {
+    return NextResponse.json(
+      {
+        error:
+          "Contact number must be PH mobile (e.g. +63917xxxxxxx or 0917xxxxxxx).",
+      },
+      { status: 400 },
+    )
+  }
+
   const member = await prisma.member.create({
     data: {
       memberNo,
       name: data.name,
       address: data.address,
-      contactNo: data.contactNo,
+      contactNo: normalizedContact ?? null,
       religion: data.religion,
       occupation: data.occupation,
       cbu: data.cbu,

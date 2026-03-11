@@ -66,6 +66,8 @@ export function UpdateApplicationStatus({
         alert(json.error ?? "Failed to update")
         return
       }
+      // Let client-side history tables re-fetch immediately (no manual refresh needed).
+      window.dispatchEvent(new Event("activity-log-updated"))
       router.refresh()
     } finally {
       setLoading(false)
