@@ -57,15 +57,15 @@ export default async function LoanApplyPage({
     redirect("/dashboard?error=member_not_linked")
   }
 
-  // For member role, check if there is an existing loan that is not yet fully paid.
+  // For member role, check if there is an existing loan with an outstanding balance (only those block new applications).
+  // PAID and RENEWED loans with P0 balance do not block.
   const existingLoan =
     isMemberRole && currentMemberId
       ? await prisma.loan.findFirst({
           where: {
             memberId: currentMemberId,
-            status: {
-              in: ["ACTIVE", "DELINQUENT", "RENEWED"],
-            },
+            status: { in: ["ACTIVE", "DELINQUENT", "RENEWED"] },
+            outstandingBalance: { gt: 0.01 },
           },
           orderBy: { createdAt: "desc" },
           select: {

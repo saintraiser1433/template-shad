@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { sendSms } from "@/lib/sms"
 import type { ApplicationStatus } from "@prisma/client"
 
 const VALID_TRANSITIONS: Record<string, ApplicationStatus[]> = {
@@ -49,7 +50,7 @@ export async function PATCH(
   const newStatus = body.status as ApplicationStatus | undefined
   const application = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { member: { select: { userId: true, name: true, memberNo: true } } },
+    include: { member: { select: { userId: true, name: true, memberNo: true, contactNo: true } } },
   })
   if (!application) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 })
@@ -212,6 +213,12 @@ export async function PATCH(
         link: "/loans",
       },
     })
+    // SMS: Loan application approved
+    const smsBody = `MCFMP: Your loan application ${application.applicationNo} has been APPROVED. Please wait for finance to fund and release your loan. For details, log in to your member portal.`
+    const smsResult = await sendSms(application.member.contactNo, smsBody)
+    if (!smsResult.ok) {
+      console.warn("SMS (loan approved):", smsResult.error)
+    }
   }
   if (newStatus === "REJECTED" && application.member.userId) {
     await prisma.notification.create({

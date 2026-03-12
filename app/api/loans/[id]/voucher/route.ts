@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { sendSms } from "@/lib/sms"
 import { z } from "zod"
 
 const createVoucherSchema = z.object({
@@ -122,6 +123,13 @@ export async function POST(
         details: `Application ${appNo} · ${memberLabel} · Loan ${loan.loanNo} · Voucher ${voucherNo}`,
       })
     }
+  }
+
+  // SMS: Loan released (voucher created)
+  const smsBody = `MCFMP: Your loan ${loan.loanNo} has been RELEASED. Please claim your voucher and passbook at the office and keep them for payment validation.`
+  const smsResult = await sendSms(loan.member?.contactNo ?? null, smsBody)
+  if (!smsResult.ok) {
+    console.warn("SMS (loan released):", smsResult.error)
   }
 
   return NextResponse.json(voucher, { status: 201 })

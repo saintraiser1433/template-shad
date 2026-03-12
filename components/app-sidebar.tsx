@@ -13,6 +13,7 @@ import {
   FileCheck,
   ScrollText,
   CreditCard,
+  Globe,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -68,6 +69,7 @@ const adminNavMain = [
   { title: "Requirements", url: "/requirements", icon: FileCheck },
   { title: "Payment methods", url: "/payment-methods", icon: CreditCard },
   { title: "Reports", url: "/reports", icon: FileText },
+  { title: "Landing page", url: "/admin/landing-settings", icon: Globe },
   { title: "SMS settings", url: "/admin/sms-settings", icon: Scale },
 ]
 

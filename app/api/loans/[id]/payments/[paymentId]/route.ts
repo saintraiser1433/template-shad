@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { sendSms } from "@/lib/sms"
+import { formatDate } from "@/lib/date-format"
 import { z } from "zod"
 
 const patchSchema = z.object({
@@ -39,7 +41,7 @@ export async function PATCH(
     include: {
       loan: {
         include: {
-          member: { select: { userId: true, name: true, memberNo: true } },
+          member: { select: { userId: true, name: true, memberNo: true, contactNo: true } },
           amortizationSchedule: { orderBy: { sequence: "asc" } },
           application: {
             include: { loanProduct: true },
@@ -89,6 +91,14 @@ export async function PATCH(
           link: `/loans/${loanId}`,
         },
       })
+    }
+    // SMS: Payment rejected
+    const dateStr = formatDate(payment.paymentDate)
+    const amountPlain = payment.amount.toLocaleString("en-PH")
+    const smsBody = `MCFMP: Your payment of ${amountPlain} for loan ${payment.loan.loanNo} on ${dateStr} was REJECTED. Reason: ${reason || "Contact the office for details."} Please contact the office for assistance.`
+    const smsResult = await sendSms(payment.loan.member?.contactNo ?? null, smsBody)
+    if (!smsResult.ok) {
+      console.warn("SMS (payment rejected):", smsResult.error)
     }
     return NextResponse.json({ ok: true, status: "REJECTED", rejectionReason: reason })
   }
@@ -215,6 +225,14 @@ export async function PATCH(
         link: `/loans/${loanId}`,
       },
     })
+  }
+  // SMS: Payment approved
+  const dateStr = formatDate(payment.paymentDate)
+  const amountPlain = payment.amount.toLocaleString("en-PH")
+  const smsBody = `MCFMP: Your payment of ${amountPlain} for loan ${payment.loan.loanNo} on ${dateStr} has been APPROVED. Thank you for paying on time.`
+  const smsResult = await sendSms(payment.loan.member?.contactNo ?? null, smsBody)
+  if (!smsResult.ok) {
+    console.warn("SMS (payment approved):", smsResult.error)
   }
 
   return NextResponse.json({ ok: true, status: "APPROVED" })

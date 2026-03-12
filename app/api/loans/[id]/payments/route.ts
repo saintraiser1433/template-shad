@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { sendSms } from "@/lib/sms"
 import { z } from "zod"
 import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
 import { computePenalty } from "@/lib/loan-calculator"
@@ -71,7 +72,7 @@ export async function POST(
   const loan = await prisma.loan.findUnique({
     where: { id },
     include: {
-      member: { select: { userId: true, name: true, memberNo: true } },
+      member: { select: { userId: true, name: true, memberNo: true, contactNo: true } },
       application: {
         include: { loanProduct: true },
       },
@@ -168,6 +169,13 @@ export async function POST(
           link: `/loans/${id}`,
         })),
       })
+    }
+    // SMS: Payment submitted (member online, pending approval)
+    const amountPlain = amount.toLocaleString("en-PH")
+    const smsBody = `MCFMP: Your payment of ${amountPlain} for loan ${loan.loanNo} is PENDING APPROVAL by finance. You'll receive another SMS once it is approved or rejected.`
+    const smsResult = await sendSms(loan.member?.contactNo ?? null, smsBody)
+    if (!smsResult.ok) {
+      console.warn("SMS (payment pending):", smsResult.error)
     }
     await createActivityLog({
       userId: session.user.id,

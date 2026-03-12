@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createActivityLog } from "@/lib/activity-log"
+import { sendSms } from "@/lib/sms"
 import { z } from "zod"
 import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
 import { checkRenewalEligibility, computeAmortization } from "@/lib/loan-calculator"
@@ -194,6 +195,13 @@ export async function POST(
     entityId: id,
     details: `Application ${appNo} · ${memberLabel} · Loan ${loan.loanNo} · Voucher ${loan.voucher?.voucherNo ?? voucherNo}`,
   })
+
+  // SMS: Loan released (voucher created)
+  const smsBody = `MCFMP: Your loan ${loan.loanNo} has been RELEASED. Please claim your voucher and passbook at the office and keep them for payment validation.`
+  const smsResult = await sendSms(application.member?.contactNo ?? null, smsBody)
+  if (!smsResult.ok) {
+    console.warn("SMS (loan released):", smsResult.error)
+  }
 
   return NextResponse.json({
     id: loan.id,

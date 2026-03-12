@@ -244,6 +244,30 @@ model SmsSettings {
   updatedAt DateTime @updatedAt @map("updated_at")
 }
 
+model LandingPageSettings {
+  id                    String   @id @default("singleton")
+  heroTitle             String?  @map("hero_title")
+  heroTitleHighlight    String?  @map("hero_title_highlight")
+  heroDescription       String?  @db.Text @map("hero_description")
+  ctaPrimaryText        String?  @map("cta_primary_text")
+  ctaSecondaryText      String?  @map("cta_secondary_text")
+  featuresTitle         String?  @map("features_title")
+  featuresSubtitle      String?  @db.Text @map("features_subtitle")
+  features              Json?    @map("features") // [{ title, description }, ...]
+  feature1Title         String?  @map("feature1_title")
+  feature1Description   String?  @db.Text @map("feature1_description")
+  feature2Title         String?  @map("feature2_title")
+  feature2Description   String?  @db.Text @map("feature2_description")
+  feature3Title         String?  @map("feature3_title")
+  feature3Description   String?  @db.Text @map("feature3_description")
+  feature4Title         String?  @map("feature4_title")
+  feature4Description   String?  @db.Text @map("feature4_description")
+  ctaSectionTitle       String?  @map("cta_section_title")
+  ctaSectionDescription String?  @db.Text @map("cta_section_description")
+  footerText            String?  @db.Text @map("footer_text")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+}
+
 model AmortizationSchedule {
   id          String   @id @default(cuid())
   dueDate     DateTime @map("due_date")
