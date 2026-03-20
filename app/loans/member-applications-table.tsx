@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Info } from "lucide-react"
+import { Info, Trash2 } from "lucide-react"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { ViewRemarksButton } from "@/components/view-remarks-button"
@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 
 type MemberApplicationRow = {
   id: string
@@ -33,6 +34,26 @@ type MemberApplicationRow = {
 export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[] }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const selected = rows.find((r) => r.id === openId) ?? null
+  const [removeId, setRemoveId] = useState<string | null>(null)
+  const removing = rows.find((r) => r.id === removeId) ?? null
+  const [loadingRemove, setLoadingRemove] = useState(false)
+
+  async function removeApplication(id: string) {
+    setLoadingRemove(true)
+    try {
+      const res = await fetch(`/api/applications/${id}`, { method: "DELETE" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(json.error ?? "Failed to remove application")
+        return
+      }
+      toast.success("Application removed.")
+      setRemoveId(null)
+      window.location.reload()
+    } finally {
+      setLoadingRemove(false)
+    }
+  }
 
   return (
     <>
@@ -89,19 +110,32 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
                     />
                   </td>
                   <td className="px-3 py-1.5 text-right">
-                    {app.status === "REJECTED" && app.rejectionReason ? (
-                      <Button
-                        type="button"
-                        variant="action"
-                        size="icon-sm"
-                        title="View rejection reason"
-                        onClick={() => setOpenId(app.id)}
-                      >
-                        <Info className="size-4" />
-                      </Button>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground">—</span>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {app.status === "PENDING" ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon-sm"
+                          title="Remove application"
+                          onClick={() => setRemoveId(app.id)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      ) : null}
+                      {app.status === "REJECTED" && app.rejectionReason ? (
+                        <Button
+                          type="button"
+                          variant="action"
+                          size="icon-sm"
+                          title="View rejection reason"
+                          onClick={() => setOpenId(app.id)}
+                        >
+                          <Info className="size-4" />
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -124,6 +158,27 @@ export function MemberApplicationsTable({ rows }: { rows: MemberApplicationRow[]
           <AlertDialogFooter>
             <AlertDialogCancel>Close</AlertDialogCancel>
             <AlertDialogAction onClick={() => setOpenId(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!removing} onOpenChange={(open) => !open && setRemoveId(null)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove application?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This will permanently remove application {removing?.applicationNo}. You can only remove while status is Pending.
+          </p>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loadingRemove}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removeId && removeApplication(removeId)}
+              disabled={loadingRemove}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loadingRemove ? "Removing…" : "Remove"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

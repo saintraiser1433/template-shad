@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { DocumentUploader } from "@/components/document-uploader"
 import { LoanTypeOption, formatTerm, formatMaxAmount, formatCbuRequirement } from "./loan-type-cards"
+import { CheckCircle2, XCircle } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +33,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { computeAmortization } from "@/lib/loan-calculator"
+
+type AmortizationEnum = "MONTHLY" | "DAILY" | "LUMPSUM"
+
+function normalizeAmortization(raw: unknown): AmortizationEnum {
+  if (raw === "MONTHLY" || raw === "DAILY" || raw === "LUMPSUM") return raw
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : ""
+  if (s === "monthly") return "MONTHLY"
+  if (s === "daily") return "DAILY"
+  if (s === "lumpsum" || s === "lump sum" || s === "lump-sum") return "LUMPSUM"
+  return "MONTHLY"
+}
 import { toast } from "sonner"
 import { checkRenewalEligibility } from "@/lib/loan-calculator"
 
@@ -73,6 +85,9 @@ export function LoanApplicationForm({
   const [submittedApplicationId, setSubmittedApplicationId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [existingLoan, setExistingLoan] = useState<ExistingLoanInfo | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [requirementFiles, setRequirementFiles] = useState<Record<string, File | null>>({})
+  const [optionalFiles, setOptionalFiles] = useState<File[]>([])
 
   const {
     register,
@@ -104,31 +119,69 @@ export function LoanApplicationForm({
 
   const loanSummary = useMemo(() => {
     if (!selectedProduct || !amount || amount <= 0) return null
-    const n = selectedProduct.termMonthsMin != null && selectedProduct.termMonthsMax != null
-      ? (termMonths ?? selectedProduct.termMonthsMin)
-      : selectedProduct.termDaysMin != null
-        ? ((termDays ?? selectedProduct.termDaysMin) / 30)
-        : 0
-    if (n <= 0) return null
-    const r = selectedProduct.interestRate
-    const P = amount
-    const monthlyPayment = r > 0
-      ? (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
-      : P / n
-    const totalInterest = monthlyPayment * n - P
-    const penaltyExample = monthlyPayment * (selectedProduct.penaltyRate ?? 0)
+    const amortization = normalizeAmortization(selectedProduct.amortization)
+    const amort = normalizeAmortization(selectedProduct.amortization)
+    const monthsTermPresent =
+      selectedProduct.termMonthsMin != null && selectedProduct.termMonthsMax != null
+    const daysTermPresent =
+      selectedProduct.termDaysMin != null && selectedProduct.termDaysMax != null
+    const hasMonthsTerm =
+      amort !== "DAILY" &&
+      monthsTermPresent &&
+      ((selectedProduct.termMonthsMin ?? 0) > 0 || (selectedProduct.termMonthsMax ?? 0) > 0)
+    const hasDaysTerm = amort === "DAILY" ? daysTermPresent : (!hasMonthsTerm && daysTermPresent)
+
+    const months = hasMonthsTerm
+      ? (termMonths ?? selectedProduct.termMonthsMin ?? 0)
+      : 0
+    const days = hasDaysTerm
+      ? (termDays ?? selectedProduct.termDaysMin ?? 0)
+      : 0
+
+    let periods = 0
+    if (amortization === "DAILY") {
+      const d = Math.max(0, Number(days) || 0)
+      periods = d
+    } else {
+      periods = Math.max(0, Number(months) || 0)
+    }
+
+    if (!Number.isFinite(periods) || periods <= 0) return null
+
+    const rows = computeAmortization(
+      amount,
+      selectedProduct.interestRate,
+      periods,
+      amortization,
+      new Date()
+    )
+    if (!rows || rows.length === 0) return null
+
+    const perPeriodPayment = rows[0].totalDue
+    const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0)
+    const penaltyExample = perPeriodPayment * (selectedProduct.penaltyRate ?? 0)
     return {
-      n: Math.round(n * 10) / 10,
-      monthlyPayment,
+      n: rows.length,
+      monthlyPayment: perPeriodPayment,
       totalInterest,
       penaltyExample,
-      isMonths: selectedProduct.termMonthsMin != null && selectedProduct.termMonthsMax != null,
+      isMonths: amortization === "MONTHLY",
     }
   }, [selectedProduct, amount, termMonths, termDays])
 
   const selectedProductId = selectedProduct?.id
   useEffect(() => {
     if (!selectedProduct) return
+    const amort = normalizeAmortization(selectedProduct.amortization)
+    if (
+      amort === "DAILY" &&
+      selectedProduct.termDaysMin != null &&
+      selectedProduct.termDaysMax != null
+    ) {
+      setValue("termDays", selectedProduct.termDaysMin)
+      setValue("termMonths", undefined as unknown as number)
+      return
+    }
     if (selectedProduct.termMonthsMin != null && selectedProduct.termMonthsMax != null) {
       setValue("termMonths", selectedProduct.termMonthsMin)
       setValue("termDays", undefined as unknown as number)
@@ -208,16 +261,84 @@ export function LoanApplicationForm({
     return Number.MAX_SAFE_INTEGER
   }, [selectedMember, selectedProduct])
 
-  const hasTermMonths =
+  const amortizationType = normalizeAmortization(selectedProduct?.amortization)
+  const monthsPresent =
     selectedProduct?.termMonthsMin != null && selectedProduct?.termMonthsMax != null
-  const hasTermDays =
+  const daysPresent =
     selectedProduct?.termDaysMin != null && selectedProduct?.termDaysMax != null
 
+  // Prefer days for DAILY amortization. Also treat 0–0 months as “not set”.
+  const hasTermMonths =
+    amortizationType !== "DAILY" &&
+    monthsPresent &&
+    ((selectedProduct?.termMonthsMin ?? 0) > 0 || (selectedProduct?.termMonthsMax ?? 0) > 0)
+  const hasTermDays = amortizationType === "DAILY" ? daysPresent : daysPresent
+
   async function onSubmit(_data: ApplicationFormData) {
-    const id = await ensureApplicationId()
-    if (!id) return
-    toast.success("Loan application submitted.")
-    router.push("/loans")
+    setUploading(true)
+    try {
+      const id = await ensureApplicationId()
+      if (!id) return
+
+      const uploads: Array<Promise<void>> = []
+
+      for (const [reqId, file] of Object.entries(requirementFiles)) {
+        if (!file) continue
+        const formData = new FormData()
+        formData.set("file", file)
+        formData.set("applicationId", id)
+        formData.set("category", "REQUIREMENT")
+        formData.set("requirementId", reqId)
+        uploads.push(
+          fetch("/api/documents", { method: "POST", body: formData }).then(async (res) => {
+            if (!res.ok) {
+              let message = "Upload failed"
+              try {
+                const json = await res.json()
+                if (json?.error) message = json.error
+              } catch {
+                // ignore
+              }
+              throw new Error(message)
+            }
+          })
+        )
+      }
+
+      for (const file of optionalFiles) {
+        const formData = new FormData()
+        formData.set("file", file)
+        formData.set("applicationId", id)
+        formData.set("category", "REQUIREMENT")
+        uploads.push(
+          fetch("/api/documents", { method: "POST", body: formData }).then(async (res) => {
+            if (!res.ok) {
+              let message = "Upload failed"
+              try {
+                const json = await res.json()
+                if (json?.error) message = json.error
+              } catch {
+                // ignore
+              }
+              throw new Error(message)
+            }
+          })
+        )
+      }
+
+      if (uploads.length > 0) {
+        await Promise.all(uploads)
+      }
+
+      setConfirmOpen(false)
+      toast.success("Application submitted successfully.")
+      router.push("/loans")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to submit application"
+      toast.error(msg)
+    } finally {
+      setUploading(false)
+    }
   }
 
   function clearSelection() {
@@ -244,12 +365,16 @@ export function LoanApplicationForm({
       return null
     }
 
-    const hasMonthsTerm =
+    const amort = normalizeAmortization(selectedProduct.amortization)
+    const monthsTermPresent =
       selectedProduct.termMonthsMin != null && selectedProduct.termMonthsMax != null
-    const hasDaysTerm =
-      !hasMonthsTerm &&
-      selectedProduct.termDaysMin != null &&
-      selectedProduct.termDaysMax != null
+    const daysTermPresent =
+      selectedProduct.termDaysMin != null && selectedProduct.termDaysMax != null
+    const hasMonthsTerm =
+      amort !== "DAILY" &&
+      monthsTermPresent &&
+      ((selectedProduct.termMonthsMin ?? 0) > 0 || (selectedProduct.termMonthsMax ?? 0) > 0)
+    const hasDaysTerm = amort === "DAILY" ? daysTermPresent : (!hasMonthsTerm && daysTermPresent)
 
     if (hasMonthsTerm) {
       if (!termMonthsNum || Number.isNaN(termMonthsNum) || termMonthsNum <= 0) {
@@ -288,6 +413,8 @@ export function LoanApplicationForm({
     setError(null)
     setSelectedProduct(null)
     setSubmittedApplicationId(null)
+    setRequirementFiles({})
+    setOptionalFiles([])
     reset({
       memberId: currentMemberId ?? defaultMemberId ?? "",
       amount: 0,
@@ -368,6 +495,22 @@ export function LoanApplicationForm({
               <p>{selectedProduct.penaltyLabel}</p>
               <p className="mt-2 font-medium text-muted-foreground">Amortization</p>
               <p>{selectedProduct.amortization}</p>
+              <p className="mt-2 font-medium text-muted-foreground">
+                Minimum CBU requirement
+              </p>
+              <div className="flex items-center gap-2">
+                {selectedProduct.requiresGoodStanding === false ? (
+                  <>
+                    <XCircle className="size-4 text-muted-foreground" />
+                    <p>No minimum ₱20,000 CBU required</p>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="size-4 text-emerald-600" />
+                    <p>Requires regular member + at least ₱20,000 CBU</p>
+                  </>
+                )}
+              </div>
               {selectedProduct.maxCbuPercent != null && amount > 0 && (
                 <>
                   <p className="mt-2 font-medium text-muted-foreground">CBU requirement</p>
@@ -513,7 +656,7 @@ export function LoanApplicationForm({
                     step="0.01"
                     min={0}
                     max={maxAmount < Number.MAX_SAFE_INTEGER ? maxAmount : undefined}
-                    {...register("amount")}
+                    {...register("amount", { valueAsNumber: true })}
                   />
                   {maxAmount < Number.MAX_SAFE_INTEGER && (
                     <p className="text-xs text-muted-foreground">
@@ -533,7 +676,7 @@ export function LoanApplicationForm({
                       type="number"
                       min={selectedProduct.termMonthsMin ?? 1}
                       max={selectedProduct.termMonthsMax ?? 120}
-                      {...register("termMonths")}
+                      {...register("termMonths", { valueAsNumber: true })}
                     />
                     <p className="text-xs text-muted-foreground">
                       {selectedProduct.termMonthsMin} to {selectedProduct.termMonthsMax} months
@@ -547,7 +690,7 @@ export function LoanApplicationForm({
                       type="number"
                       min={selectedProduct.termDaysMin ?? 1}
                       max={selectedProduct.termDaysMax ?? 365}
-                      {...register("termDays")}
+                      {...register("termDays", { valueAsNumber: true })}
                     />
                     <p className="text-xs text-muted-foreground">
                       {selectedProduct.termDaysMin} to {selectedProduct.termDaysMax} days
@@ -562,41 +705,102 @@ export function LoanApplicationForm({
                   <Field>
                     <FieldLabel>Required documents</FieldLabel>
                     <p className="mb-2 text-xs text-muted-foreground">
-                      Upload one file per requirement. You can upload before or after submitting the application.
+                      Choose one file per requirement. Files will be uploaded when you submit the application.
                     </p>
                     <div className="space-y-1 rounded-lg border p-3">
                       {selectedProduct.requirements.map((r) => (
-                        <DocumentUploader
-                          key={r.id}
-                          applicationId={submittedApplicationId}
-                          category="REQUIREMENT"
-                          requirementId={r.id}
-                          requirementName={r.name}
-                          getOrCreateApplicationId={ensureApplicationId}
-                        />
+                        <div key={r.id} className="py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span className="font-medium text-sm">{r.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] ?? null
+                                  setRequirementFiles((prev) => ({ ...prev, [r.id]: file }))
+                                }}
+                                disabled={isSubmitting || uploading}
+                                className="max-w-[260px]"
+                              />
+                              {requirementFiles[r.id] ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setRequirementFiles((prev) => ({ ...prev, [r.id]: null }))
+                                  }
+                                  disabled={isSubmitting || uploading}
+                                >
+                                  Remove
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          {requirementFiles[r.id] ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Selected: {requirementFiles[r.id]!.name}
+                            </p>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   </Field>
                 ) : (
                   <Field>
-                    <DocumentUploader
-                      applicationId={submittedApplicationId}
-                      category="REQUIREMENT"
-                      label="Upload documents (optional)"
-                      getOrCreateApplicationId={ensureApplicationId}
+                    <FieldLabel>Upload documents (optional)</FieldLabel>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Select files now; they’ll be uploaded when you submit the application.
+                    </p>
+                    <Input
+                      type="file"
+                      multiple
+                      accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? [])
+                        setOptionalFiles(files)
+                      }}
+                      disabled={isSubmitting || uploading}
                     />
+                    {optionalFiles.length > 0 ? (
+                      <div className="mt-2 rounded border bg-muted/30 p-2 text-xs">
+                        <p className="font-medium">Selected files</p>
+                        <ul className="mt-1 space-y-1">
+                          {optionalFiles.map((f) => (
+                            <li key={`${f.name}-${f.size}-${f.lastModified}`}>{f.name}</li>
+                          ))}
+                        </ul>
+                        <div className="mt-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setOptionalFiles([])}
+                            disabled={isSubmitting || uploading}
+                          >
+                            Clear files
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </Field>
                 )}
               </FieldGroup>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || uploading}
                   onClick={() => setConfirmOpen(true)}
                 >
-                  {isSubmitting ? "Submitting…" : "Submit application"}
+                  {isSubmitting || uploading ? "Submitting…" : "Submit application"}
                 </Button>
-                <Button type="button" variant="outline" onClick={handleClear}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClear}
+                  disabled={isSubmitting || uploading}
+                >
                   Clear
                 </Button>
               </div>

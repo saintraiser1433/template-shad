@@ -7,6 +7,16 @@ import { LOAN_TYPE_CONFIG, getMaxAmountForLoanType } from "@/lib/loan-config"
 import { GOOD_STANDING_CBU_MIN } from "@/lib/loan-config"
 import { checkRenewalEligibility } from "@/lib/loan-calculator"
 
+type AmortizationEnum = "MONTHLY" | "DAILY" | "LUMPSUM"
+function normalizeAmortization(raw: unknown): AmortizationEnum {
+  if (raw === "MONTHLY" || raw === "DAILY" || raw === "LUMPSUM") return raw
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : ""
+  if (s === "monthly") return "MONTHLY"
+  if (s === "daily") return "DAILY"
+  if (s === "lumpsum" || s === "lump sum" || s === "lump-sum") return "LUMPSUM"
+  return "MONTHLY"
+}
+
 const loanTypeEnum = z.enum([
   "MEMBERSHIP_LOAN",
   "MICRO_LOAN",
@@ -75,13 +85,26 @@ export async function POST(req: NextRequest) {
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 })
   }
-  const goodStanding =
-    member.isRegularMember && member.cbu >= GOOD_STANDING_CBU_MIN
-  if (!goodStanding) {
-    return NextResponse.json(
-      { error: "Member must be in good standing (regular member with at least ₱20,000 CBU)" },
-      { status: 400 }
-    )
+
+  const product = loanProductId
+    ? await prisma.loanProduct.findUnique({
+        where: { id: loanProductId },
+        select: { requiresGoodStanding: true, name: true },
+      })
+    : null
+
+  const requiresGoodStanding = product?.requiresGoodStanding ?? true
+  if (requiresGoodStanding) {
+    const goodStanding = member.isRegularMember && member.cbu >= GOOD_STANDING_CBU_MIN
+    if (!goodStanding) {
+      return NextResponse.json(
+        {
+          error:
+            "This loan type requires good standing (regular member with at least ₱20,000 CBU).",
+        },
+        { status: 400 }
+      )
+    }
   }
 
   // Enforce one active/incomplete loan at a time per member
@@ -169,9 +192,29 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-    if (product.termMonthsMin != null && product.termMonthsMax != null) {
-      const term = termMonths ?? (termDays != null ? Math.ceil(termDays / 30) : product.termMonthsMin)
-      if (term < product.termMonthsMin || term > product.termMonthsMax) {
+    const amort = normalizeAmortization(product.amortization)
+    const monthsRangePresent =
+      product.termMonthsMin != null && product.termMonthsMax != null &&
+      ((product.termMonthsMin ?? 0) > 0 || (product.termMonthsMax ?? 0) > 0)
+    const daysRangePresent =
+      product.termDaysMin != null && product.termDaysMax != null
+
+    // DAILY amortization must validate days (even if months are 0–0).
+    if (amort === "DAILY" && daysRangePresent) {
+      const term = termDays ?? product.termDaysMin!
+      if (term < product.termDaysMin! || term > product.termDaysMax!) {
+        return NextResponse.json(
+          { error: `Term must be between ${product.termDaysMin} and ${product.termDaysMax} days` },
+          { status: 400 }
+        )
+      }
+      finalTermDays = term
+      finalTermMonths = null
+    } else if (monthsRangePresent) {
+      const term =
+        termMonths ??
+        (termDays != null ? Math.ceil(termDays / 30) : product.termMonthsMin!)
+      if (term < product.termMonthsMin! || term > product.termMonthsMax!) {
         return NextResponse.json(
           { error: `Term must be between ${product.termMonthsMin} and ${product.termMonthsMax} months` },
           { status: 400 }
@@ -179,9 +222,9 @@ export async function POST(req: NextRequest) {
       }
       finalTermMonths = term
       finalTermDays = null
-    } else if (product.termDaysMin != null && product.termDaysMax != null) {
-      const term = termDays ?? product.termDaysMin
-      if (term < product.termDaysMin || term > product.termDaysMax) {
+    } else if (daysRangePresent) {
+      const term = termDays ?? product.termDaysMin!
+      if (term < product.termDaysMin! || term > product.termDaysMax!) {
         return NextResponse.json(
           { error: `Term must be between ${product.termDaysMin} and ${product.termDaysMax} days` },
           { status: 400 }

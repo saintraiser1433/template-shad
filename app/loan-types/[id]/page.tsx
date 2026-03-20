@@ -78,9 +78,11 @@ export default async function EditLoanTypePage({
                 termMonthsMax: product.termMonthsMax ?? undefined,
                 termDaysMin: product.termDaysMin ?? undefined,
                 termDaysMax: product.termDaysMax ?? undefined,
+                // Prisma client types update after `prisma generate`.
+                requiresGoodStanding: (product as unknown as { requiresGoodStanding?: boolean }).requiresGoodStanding ?? true,
                 maxCbuPercent: product.maxCbuPercent ?? undefined,
                 maxAmountFixed: product.maxAmountFixed ?? undefined,
-                amortization: product.amortization,
+                amortization: product.amortization as unknown as "MONTHLY" | "DAILY" | "LUMPSUM",
                 interestRate: product.interestRate,
                 interestLabel: product.interestLabel,
                 penaltyRate: product.penaltyRate,

@@ -14,6 +14,8 @@ import {
 import { AlertTriangle } from "lucide-react"
 import { LoanApplicationForm } from "./loan-application-form"
 import { checkRenewalEligibility } from "@/lib/loan-calculator"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export default async function LoanApplyPage({
   searchParams,
@@ -85,6 +87,27 @@ export default async function LoanApplyPage({
       existingLoan.principalAmount
     )
 
+  const existingApplication =
+    isMemberRole && currentMemberId
+      ? await prisma.loanApplication.findFirst({
+          where: {
+            memberId: currentMemberId,
+            status: {
+              in: [
+                "PENDING",
+                "CIBI_REVIEW",
+                "MANAGER_REVIEW",
+                "COMMITTEE_REVIEW",
+                "BOARD_REVIEW",
+                "APPROVED",
+              ],
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, applicationNo: true, status: true },
+        })
+      : null
+
   const loanProductsWithReqs = loanProducts.map((p) => ({
     ...p,
     requirements: p.requirements.map((r) => ({
@@ -130,6 +153,31 @@ export default async function LoanApplyPage({
                   ₱{existingLoan.outstandingBalance.toLocaleString("en-PH")}. You need to pay at least{" "}
                   70% of the current loan principal (or fully pay this loan) before applying for a new one.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : isMemberRole && existingApplication ? (
+        <div className="flex flex-1 items-center justify-center p-4 pt-6">
+          <div className="w-full max-w-2xl text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Outstanding loan application in progress</h2>
+                <p className="mt-2 text-base text-muted-foreground">
+                  You can’t apply for a new loan right now because you still have a pending loan application
+                  ({existingApplication.applicationNo}). If you want to apply again, please remove/cancel your pending application first.
+                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button asChild variant="outline">
+                    <Link href="/loans">Go to my applications</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/loans?appStatus=PENDING">View pending</Link>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

@@ -5,6 +5,14 @@ export const GOOD_STANDING_CBU_MIN = 20_000 // 20k PHP
 export const MANAGER_APPROVAL_LIMIT = 100_000 // 100k PHP
 export const RENEWAL_MIN_PAID_PERCENT = 70
 
+export const AMORTIZATION_OPTIONS = [
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "DAILY", label: "Daily" },
+  { value: "LUMPSUM", label: "Lump sum" },
+] as const
+
+export type AmortizationOptionValue = (typeof AMORTIZATION_OPTIONS)[number]["value"]
+
 export type LoanTypeConfig = {
   label: string
   termMonthsMin: number
@@ -14,7 +22,7 @@ export type LoanTypeConfig = {
   maxAmount: number | ((cbu: number) => number) // fixed or 80% of CBU
   interestRate: number // per month or per term as decimal (e.g. 0.03 = 3%)
   interestPeriod: "month" | "term" | "year"
-  amortization: "MONTHLY" | "DAILY" | "LUMPSUM"
+  amortization: AmortizationOptionValue
   penaltyRate: number // 2% = 0.02 per month
   penaltyBase: "delayed_amortization" | "outstanding_after_term"
 }

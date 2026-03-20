@@ -8,6 +8,15 @@ import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
 import { checkRenewalEligibility, computeAmortization } from "@/lib/loan-calculator"
 import type { AmortizationType } from "@prisma/client"
 
+function normalizeAmortization(raw: unknown): AmortizationType {
+  if (raw === "MONTHLY" || raw === "DAILY" || raw === "LUMPSUM") return raw
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : ""
+  if (s === "monthly") return "MONTHLY"
+  if (s === "daily") return "DAILY"
+  if (s === "lumpsum" || s === "lump sum" || s === "lump-sum") return "LUMPSUM"
+  return "MONTHLY"
+}
+
 const bodySchema = z.object({
   releaseMethod: z.enum(["CASH", "CHEQUE"]),
   chequeNo: z.string().optional(),
@@ -34,7 +43,7 @@ export async function POST(
 
   const application = await prisma.loanApplication.findUnique({
     where: { id },
-    include: { member: true },
+    include: { member: true, loanProduct: true },
   })
   if (!application) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 })
@@ -56,14 +65,15 @@ export async function POST(
   }
 
   const config = LOAN_TYPE_CONFIG[application.loanType]
+  const amortization = normalizeAmortization(application.loanProduct?.amortization ?? config.amortization)
   const principalRequested = application.amount
   const termMonths = application.termMonths ?? 1
   const termDays = application.termDays ?? termMonths * 30
   const rate = config.interestRate
   const periods =
-    config.amortization === "DAILY"
+    amortization === "DAILY"
       ? Math.min(Math.max(termDays, 45), 50)
-      : config.amortization === "LUMPSUM"
+      : amortization === "LUMPSUM"
         ? termMonths
         : termMonths
   const startDate = new Date()
@@ -132,7 +142,7 @@ export async function POST(
       interestRate: rate,
       termMonths: application.termMonths,
       termDays: application.termDays,
-      amortizationType: config.amortization as AmortizationType,
+      amortizationType: amortization,
       outstandingBalance: principal,
       status: "ACTIVE",
       applicationId: application.id,

@@ -346,6 +346,7 @@ model LoanProduct {
   termMonthsMax  Int?
   termDaysMin    Int?
   termDaysMax    Int?
+  requiresGoodStanding Boolean @default(true) @map("requires_good_standing") // requires regular member + ≥ 20k CBU
   maxCbuPercent  Float?   // e.g. 80 means 80% of CBU
   maxAmountFixed Float?   // fixed peso ceiling, optional
   amortization   String   // e.g. "Monthly", "Daily", "Lump sum"

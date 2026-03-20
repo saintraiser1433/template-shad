@@ -253,3 +253,50 @@ export async function PATCH(
 
   return NextResponse.json(updated)
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { id } = await params
+  const application = await prisma.loanApplication.findUnique({
+    where: { id },
+    include: { member: { select: { userId: true, name: true, memberNo: true } } },
+  })
+  if (!application) {
+    return NextResponse.json({ error: "Application not found" }, { status: 404 })
+  }
+
+  // Only the owning MEMBER can delete, and only while still PENDING.
+  if (session.user.role !== "MEMBER") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  if (!application.member?.userId || application.member.userId !== session.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  if (application.status !== "PENDING") {
+    return NextResponse.json(
+      { error: "Only pending applications can be removed." },
+      { status: 400 }
+    )
+  }
+
+  await prisma.loanApplication.delete({ where: { id } })
+
+  const memberLabel =
+    application.member?.name || application.member?.memberNo || "Unknown member"
+  await createActivityLog({
+    userId: session.user.id,
+    action: "APPLICATION_STATUS_CHANGED",
+    entityType: "LoanApplication",
+    entityId: id,
+    details: `Application ${application.applicationNo} · ${memberLabel} · Removed by member`,
+  })
+
+  return NextResponse.json({ ok: true })
+}

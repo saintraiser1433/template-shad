@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm, type Resolver } from "react-hook-form"
+import { Controller, useForm, type Resolver } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -14,6 +14,26 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  AMORTIZATION_OPTIONS,
+  type AmortizationOptionValue,
+} from "@/lib/loan-config"
+
+function normalizeAmortization(raw: unknown): AmortizationOptionValue {
+  if (raw === "MONTHLY" || raw === "DAILY" || raw === "LUMPSUM") return raw
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : ""
+  if (s === "monthly") return "MONTHLY"
+  if (s === "daily") return "DAILY"
+  if (s === "lumpsum" || s === "lump sum" || s === "lump-sum") return "LUMPSUM"
+  return "MONTHLY"
+}
 
 const schema = z
   .object({
@@ -22,9 +42,12 @@ const schema = z
     termMonthsMax: z.coerce.number().int().min(0).optional().or(z.nan()),
     termDaysMin: z.coerce.number().int().min(0).optional().or(z.nan()),
     termDaysMax: z.coerce.number().int().min(0).optional().or(z.nan()),
+    requiresGoodStanding: z.coerce.boolean().optional(),
     maxCbuPercent: z.coerce.number().min(0).max(100).optional().or(z.nan()),
     maxAmountFixed: z.coerce.number().min(0).optional().or(z.nan()),
-    amortization: z.string().min(1, "Amortization is required"),
+    amortization: z.enum(["MONTHLY", "DAILY", "LUMPSUM"], {
+      required_error: "Amortization is required",
+    }),
     interestRate: z.coerce.number().min(0, "Interest rate must be ≥ 0"),
     interestLabel: z.string().min(1, "Interest description is required"),
   penaltyRate: z.coerce.number().min(0, "Penalty rate must be ≥ 0"),
@@ -87,7 +110,8 @@ export function LoanTypeForm({
   useEffect(() => {
     if (prevIdRef.current !== id) {
       prevIdRef.current = id
-      setSelectedRequirementIds(defaultRequirementIds)
+      // Avoid synchronous setState inside effect (eslint rule).
+      queueMicrotask(() => setSelectedRequirementIds(defaultRequirementIds))
     }
   }, [id, defaultRequirementIds])
 
@@ -102,21 +126,26 @@ export function LoanTypeForm({
   const {
     register,
     handleSubmit,
+    control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: {
       name: "",
-      amortization: "Monthly",
+      amortization: "MONTHLY",
+      requiresGoodStanding: true,
       interestRate: 0.03,
       interestLabel: "3% per month diminishing",
       penaltyRate: 0.02,
       penaltyLabel: "2% per month based on amortization delayed",
       ...defaultValues,
+      amortization: normalizeAmortization(defaultValues?.amortization),
     },
   })
 
-  const [termMode, setTermMode] = useState<"months" | "days" | "both">("months")
+  const [termMode, setTermMode] = useState<"months" | "days">("months")
+  const amortization = normalizeAmortization(watch("amortization"))
 
   async function onSubmit(data: FormData) {
     setError(null)
@@ -193,20 +222,14 @@ export function LoanTypeForm({
             />
             <span>Days only</span>
           </label>
-          <label className="inline-flex items-center gap-1">
-            <input
-              type="radio"
-              name="termMode"
-              value="both"
-              checked={termMode === "both"}
-              onChange={() => setTermMode("both")}
-            />
-            <span>Both (advanced)</span>
-          </label>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="termMonthsMin">Term (months) min</FieldLabel>
+            <FieldLabel htmlFor="termMonthsMin">
+              {amortization === "LUMPSUM" && termMode !== "days"
+                ? "Pay Every (Months)"
+                : "Term (months) min"}
+            </FieldLabel>
             <Input
               id="termMonthsMin"
               type="number"
@@ -215,7 +238,11 @@ export function LoanTypeForm({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="termMonthsMax">Term (months) max</FieldLabel>
+            <FieldLabel htmlFor="termMonthsMax">
+              {amortization === "LUMPSUM" && termMode !== "days"
+                ? "Pay Terms"
+                : "Term (months) max"}
+            </FieldLabel>
             <Input
               id="termMonthsMax"
               type="number"
@@ -226,7 +253,11 @@ export function LoanTypeForm({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="termDaysMin">Term (days) min</FieldLabel>
+            <FieldLabel htmlFor="termDaysMin">
+              {amortization === "LUMPSUM" && termMode !== "months"
+                ? "Pay Every (Days)"
+                : "Term (days) min"}
+            </FieldLabel>
             <Input
               id="termDaysMin"
               type="number"
@@ -235,7 +266,11 @@ export function LoanTypeForm({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="termDaysMax">Term (days) max</FieldLabel>
+            <FieldLabel htmlFor="termDaysMax">
+              {amortization === "LUMPSUM" && termMode !== "months"
+                ? "Pay Terms"
+                : "Term (days) max"}
+            </FieldLabel>
             <Input
               id="termDaysMax"
               type="number"
@@ -269,12 +304,44 @@ export function LoanTypeForm({
           </Field>
         </div>
         <Field>
+          <FieldLabel>Member eligibility</FieldLabel>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 rounded border-input"
+              {...register("requiresGoodStanding")}
+              defaultChecked
+            />
+            <span className="leading-tight">
+              Require at least <span className="font-medium">₱20,000 CBU</span> (good standing).
+              <span className="block text-xs text-muted-foreground mt-1">
+                If unchecked, members below ₱20,000 CBU can apply for this loan type.
+              </span>
+            </span>
+          </label>
+        </Field>
+        <Field>
           <FieldLabel htmlFor="amortization">Amortization *</FieldLabel>
-          <Input
-            id="amortization"
-            placeholder="Monthly"
-            disabled
-            {...register("amortization")}
+          <Controller
+            control={control}
+            name="amortization"
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onValueChange={(v) => field.onChange(normalizeAmortization(v))}
+              >
+                <SelectTrigger id="amortization" className="w-full">
+                  <SelectValue placeholder="Select amortization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AMORTIZATION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           />
           {errors.amortization && (
             <p className="text-sm text-destructive">
