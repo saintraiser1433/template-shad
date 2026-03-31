@@ -116,6 +116,14 @@ export default async function LoanApplyPage({
     })),
   }))
 
+  const memberCbu = isMemberRole && members.length === 1 ? Number(members[0].cbu ?? 0) : 0
+  const visibleLoanProducts =
+    isMemberRole
+      ? loanProductsWithReqs.filter(
+          (p) => p.requiresGoodStanding === false || memberCbu >= 20000
+        )
+      : loanProductsWithReqs
+
   return (
     <DashboardLayout>
       <ModuleHeader
@@ -191,7 +199,7 @@ export default async function LoanApplyPage({
               name: m.name,
               cbu: m.cbu,
             }))}
-            loanProducts={loanProductsWithReqs}
+            loanProducts={visibleLoanProducts}
             defaultMemberId={currentMemberId ?? memberId ?? undefined}
             currentMemberId={currentMemberId}
           />
