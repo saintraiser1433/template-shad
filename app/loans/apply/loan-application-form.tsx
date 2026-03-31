@@ -400,7 +400,12 @@ export function LoanApplicationForm({
         purpose: values.purpose,
       }),
     })
-    const json = await res.json()
+    let json: any = null
+    try {
+      json = await res.json()
+    } catch {
+      json = null
+    }
     if (!res.ok) {
       setError(json.error ?? "Failed to save application")
       return null

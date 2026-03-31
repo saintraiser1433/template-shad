@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     )
   }
   const data = parsed.data
+  const normalizedEmail = data.email?.trim().toLowerCase()
 
   // Auto-generate memberNo as MCF-001, MCF-002, ...
   const last = await prisma.member.findFirst({
@@ -86,14 +87,25 @@ export async function POST(req: NextRequest) {
   const memberNo = `MCF-${String(nextNum).padStart(3, "0")}`
 
   let userId: string | undefined
-  if (data.email) {
+  if (normalizedEmail) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    })
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "Email already exists. Please use a different email." },
+        { status: 400 }
+      )
+    }
+
     const passwordHash = data.password
       ? await bcrypt.hash(data.password, 10)
       : undefined
     if (passwordHash) {
       const user = await prisma.user.create({
         data: {
-          email: data.email.toLowerCase(),
+          email: normalizedEmail,
           name: data.name,
           passwordHash,
           role: "MEMBER",
