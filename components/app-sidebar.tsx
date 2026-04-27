@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Image from "next/image"
 import {
@@ -92,14 +93,21 @@ function getNavForRole(role: string | undefined) {
     case "MEMBER":
       return memberNavMain
     default:
-      return adminNavMain
+      return []
   }
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const role = session?.user?.role
-  const navMain = getNavForRole(role)
+  // Keep initial SSR and first CSR render deterministic to avoid hydration mismatch.
+  const navMain = !mounted || status === "loading" ? [] : getNavForRole(role)
 
   return (
     <Sidebar variant="inset" {...props}>

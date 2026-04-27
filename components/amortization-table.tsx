@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/date-format"
+import { formatPeso } from "@/lib/money-format"
 import { StatusBadge } from "@/components/status-badge"
 
 type ScheduleRow = {
@@ -47,7 +48,7 @@ export function AmortizationTable({
           {schedule.map((row) => {
             const due = new Date(row.dueDate)
             const isOverdue = !row.isPaid && due < now
-            const totalDue = row.totalDue + row.penalty
+            const dueWithPenalty = row.totalDue + row.penalty
             const paid = row.paidAmount ?? 0
             const isPartial = !row.isPaid && paid > 0
             return (
@@ -68,20 +69,20 @@ export function AmortizationTable({
                   {formatDate(due)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  ₱{row.principal.toLocaleString("en-PH")}
+                  ₱{formatPeso(row.principal)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  ₱{row.interest.toLocaleString("en-PH")}
+                  ₱{formatPeso(row.interest)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  ₱{row.totalDue.toLocaleString("en-PH")}
+                  ₱{formatPeso(row.totalDue)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
-                  ₱{row.penalty.toLocaleString("en-PH")}
+                  ₱{formatPeso(row.penalty)}
                 </td>
                 <td className="px-3 py-1.5 text-right">
                   {row.cbuPerPeriod != null && row.cbuPerPeriod > 0
-                    ? `₱${row.cbuPerPeriod.toLocaleString("en-PH")}`
+                    ? `₱${formatPeso(row.cbuPerPeriod)}`
                     : "—"}
                 </td>
                 <td className="px-3 py-1.5">
@@ -107,7 +108,7 @@ export function AmortizationTable({
                     <span className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge status="PARTIAL" />
                       <span className="text-muted-foreground text-[11px]">
-                        ₱{paid.toLocaleString("en-PH")} / ₱{totalDue.toLocaleString("en-PH")}
+                        ₱{formatPeso(paid)} / ₱{formatPeso(dueWithPenalty)}
                       </span>
                     </span>
                   ) : isOverdue ? (

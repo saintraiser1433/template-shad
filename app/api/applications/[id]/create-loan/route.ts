@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { LOAN_TYPE_CONFIG } from "@/lib/loan-config"
+import { LOAN_TYPE_CONFIG, getMonthlyScheduleMethodForLoanType } from "@/lib/loan-config"
 import { checkRenewalEligibility, computeAmortization } from "@/lib/loan-calculator"
 import type { AmortizationType } from "@prisma/client"
 
@@ -90,12 +90,17 @@ export async function POST(
     }
   }
 
+  const monthlyMethod = getMonthlyScheduleMethodForLoanType(application.loanType)
+
   const scheduleRows = computeAmortization(
     principal,
     rate,
     periods,
-    config.amortization,
-    startDate
+    amortization,
+    startDate,
+    amortization === "MONTHLY"
+      ? { monthlyScheduleMethod: monthlyMethod }
+      : undefined
   )
 
   const loanCount = await prisma.loan.count()

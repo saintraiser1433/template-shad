@@ -25,6 +25,7 @@ import { ViewVoucherModal } from "./view-voucher-modal"
 import { SchedulePaymentsButton } from "./schedule-payments-button"
 import { ViewPaymentReceiptButton } from "./view-payment-receipt-button"
 import { formatDate } from "@/lib/date-format"
+import { formatPeso } from "@/lib/money-format"
 
 export default async function LoanDetailPage({
   params,
@@ -303,7 +304,7 @@ export default async function LoanDetailPage({
                   Member CBU
                 </p>
                 <p className="font-medium">
-                  ₱{loan.member.cbu.toLocaleString("en-PH")}
+                  ₱{formatPeso(loan.member.cbu)}
                 </p>
               </div>
               {totalCbuFromThisLoan > 0 && (
@@ -312,7 +313,7 @@ export default async function LoanDetailPage({
                     CBU from this loan (so far)
                   </p>
                   <p className="font-medium">
-                    ₱{totalCbuFromThisLoan.toLocaleString("en-PH")}
+                    ₱{formatPeso(totalCbuFromThisLoan)}
                   </p>
                 </div>
               )}
@@ -333,10 +334,10 @@ export default async function LoanDetailPage({
                   </p>
                   <p className="font-medium">
                     ₱
-                    {(
+                    {formatPeso(
                       loan.principalAmount *
-                      (loan.application.loanProduct.maxCbuPercent / 100)
-                    ).toLocaleString("en-PH")}
+                        (loan.application.loanProduct.maxCbuPercent / 100)
+                    )}
                   </p>
                 </div>
               )}
@@ -375,7 +376,7 @@ export default async function LoanDetailPage({
                   Principal
                 </p>
                 <p className="font-medium">
-                  ₱{loan.principalAmount.toLocaleString("en-PH")}
+                  ₱{formatPeso(loan.principalAmount)}
                 </p>
               </div>
               <div>
@@ -383,7 +384,7 @@ export default async function LoanDetailPage({
                   Outstanding balance
                 </p>
                 <p className="font-medium">
-                  ₱{loan.outstandingBalance.toLocaleString("en-PH")}
+                  ₱{formatPeso(loan.outstandingBalance)}
                 </p>
               </div>
               <div>
@@ -454,7 +455,13 @@ export default async function LoanDetailPage({
             <CardHeader>
               <CardTitle>Amortization schedule</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Installment breakdown by due date, principal, interest, and penalty.
+                <span className="block">
+                  <span className="font-medium text-foreground">Total due</span> is the full
+                  installment: principal + interest (and any penalty if late). The two
+                  parts do not have to be the same number; for current monthly loans the
+                  schedule uses a <span className="font-medium">flat (add-on)</span> split
+                  with the same principal and the same interest every month.
+                </span>
               </p>
             </CardHeader>
             <CardContent>
@@ -600,16 +607,16 @@ export default async function LoanDetailPage({
                             {formatDate(p.paymentDate)}
                           </td>
                           <td className="px-3 py-1.5">
-                            ₱{p.amount.toLocaleString("en-PH")}
+                            ₱{formatPeso(p.amount)}
                           </td>
                           <td className="px-3 py-1.5">
-                            ₱{p.principal.toLocaleString("en-PH")}
+                            ₱{formatPeso(p.principal)}
                           </td>
                           <td className="px-3 py-1.5">
-                            ₱{p.interest.toLocaleString("en-PH")}
+                            ₱{formatPeso(p.interest)}
                           </td>
                           <td className="px-3 py-1.5">
-                            ₱{p.penalty.toLocaleString("en-PH")}
+                            ₱{formatPeso(p.penalty)}
                           </td>
                           <td className="px-3 py-1.5">
                             <div>
@@ -633,7 +640,7 @@ export default async function LoanDetailPage({
                           </td>
                           <td className="px-3 py-1.5">
                             {cbuAdded > 0
-                              ? `₱${cbuAdded.toLocaleString("en-PH")}`
+                              ? `₱${formatPeso(cbuAdded)}`
                               : "—"}
                           </td>
                           <td className="px-3 py-1.5">{referenceNo ?? ""}</td>

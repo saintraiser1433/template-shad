@@ -42,6 +42,138 @@ type ApplicationForApproval = {
   cibiPassed: boolean | null
 }
 
+// ─── 5Cs read-only view (parses JSON stored by cibi-form) ────────────────────
+
+function parseJson(raw: string | null): Record<string, unknown> {
+  if (!raw) return {}
+  try { return JSON.parse(raw) as Record<string, unknown> } catch { return {} }
+}
+
+function labelMap(map: Record<string, string>, value: unknown) {
+  if (!value || typeof value !== "string") return "—"
+  return map[value] ?? value
+}
+
+function NoteVal({ v }: { v: unknown }) {
+  if (!v || (typeof v === "string" && !v.trim())) return <span className="text-muted-foreground">—</span>
+  return <span>{String(v)}</span>
+}
+
+function CibiRow({ label, status, notes }: { label: string; status: React.ReactNode; notes?: unknown }) {
+  return (
+    <tr className="align-top border-b last:border-0">
+      <td className="py-2 pr-3 text-xs text-muted-foreground w-[35%]">{label}</td>
+      <td className="py-2 pr-3 text-xs w-[35%]">{status}</td>
+      <td className="py-2 text-xs"><NoteVal v={notes} /></td>
+    </tr>
+  )
+}
+
+function CibiSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{title}</p>
+      <div className="overflow-x-auto rounded border">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b bg-muted/40">
+              <th className="py-1.5 pl-3 pr-3 text-left font-medium w-[35%]">Item</th>
+              <th className="py-1.5 pr-3 text-left font-medium w-[35%]">Finding</th>
+              <th className="py-1.5 text-left font-medium">Notes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y pl-3">{children}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+const CB_LABELS: Record<string, string> = { SATISFACTORY: "Satisfactory", ADVERSE: "Adverse", NO_HISTORY: "No History" }
+const PD_LABELS: Record<string, string> = { NONE: "None", RESOLVED: "Resolved", ACTIVE: "Active Case" }
+const EM_LABELS: Record<string, string> = { GT_2_YEARS: "> 2 Years", "1_2_YEARS": "1-2 Years", LT_1_YEAR: "< 1 Year" }
+const RISK3_LABELS: Record<string, string> = { HIGH: "High", MID: "Mid", LOW: "Low" }
+const DS_LABELS: Record<string, string> = { MANAGEABLE: "Manageable", STRETCHED: "Stretched" }
+const DTI_LABELS: Record<string, string> = { LT_35: "< 35%", "36_45": "36–45%", GT_45: "> 45%" }
+const SAV_LABELS: Record<string, string> = { "3_6_MONTHS": "3–6 Months", LT_3_MONTHS: "< 3 Months", NONE: "None" }
+const MKT_LABELS: Record<string, string> = { HIGH: "High", MODERATE: "Moderate", LOW: "Low" }
+const OWN_LABELS: Record<string, string> = { VERIFIED: "Verified", PENDING: "Pending" }
+const MS_LABELS: Record<string, string> = { GROWING: "Growing", STABLE: "Stable", DECLINING: "Declining" }
+const IR_LABELS: Record<string, string> = { MINIMAL: "Minimal", MODERATE: "Moderate", HIGH: "High" }
+const PA_LABELS: Record<string, string> = { APPROVE: "Approve", DECLINE: "Decline", CONDITIONAL: "Conditional Approval" }
+
+function CibiNotesView({
+  characterNotes,
+  capacityNotes,
+  capitalNotes,
+  collateralNotes,
+  conditionsNotes,
+}: {
+  characterNotes: string | null
+  capacityNotes: string | null
+  capitalNotes: string | null
+  collateralNotes: string | null
+  conditionsNotes: string | null
+}) {
+  const ch = parseJson(characterNotes)
+  const ca = parseJson(capacityNotes)
+  const cp = parseJson(capitalNotes)
+  const co = parseJson(collateralNotes)
+  const cn = parseJson(conditionsNotes)
+
+  const assetTypes = [
+    co.assetRealEstate ? "Real Estate" : null,
+    co.assetVehicle ? "Vehicle" : null,
+    co.assetEquipment ? "Equipment" : null,
+  ].filter(Boolean).join(", ") || "—"
+
+  return (
+    <section className="space-y-4">
+      <h3 className="text-xs font-semibold uppercase text-muted-foreground">5 Cs Evaluation</h3>
+
+      <CibiSection title="1. Character">
+        <CibiRow label="Credit Bureau Report Check" status={labelMap(CB_LABELS, ch.creditBureau)} notes={ch.creditBureauNotes} />
+        <CibiRow label="Prior Loan Default / Arrears" status={labelMap(PD_LABELS, ch.priorDefault)} notes={ch.priorDefaultNotes} />
+        <CibiRow label="Employment / Business Stability" status={labelMap(EM_LABELS, ch.employment)} notes={ch.employmentNotes} />
+      </CibiSection>
+
+      <CibiSection title="2. Capacity">
+        <CibiRow label="Gross Monthly Income" status={<NoteVal v={ca.grossIncome} />} notes={labelMap(RISK3_LABELS, ca.grossIncomeRisk)} />
+        <CibiRow label="Existing Monthly Debt Service" status={<NoteVal v={ca.debtService} />} notes={labelMap(DS_LABELS, ca.debtServiceRisk)} />
+        <CibiRow label="Debt-to-Income (DTI) Ratio" status={ca.dtiRatio ? `${ca.dtiRatio}%` : "—"} notes={labelMap(DTI_LABELS, ca.dtiRisk)} />
+      </CibiSection>
+
+      <CibiSection title="3. Capital">
+        <CibiRow label="Down Payment / Equity Contribution" status={cp.downPayment ? `${cp.downPayment}% of total cost` : "—"} notes={cp.downPaymentDetails} />
+        <CibiRow label="Emergency Savings / Reserves" status={labelMap(SAV_LABELS, cp.emergencySavings)} notes={cp.emergencySavingsDetails} />
+      </CibiSection>
+
+      <CibiSection title="4. Collateral">
+        <CibiRow label="Asset Type" status={assetTypes} notes={co.appraisedValue ? `Appraised: ${co.appraisedValue} — ${labelMap(MKT_LABELS, co.marketability)} marketability` : labelMap(MKT_LABELS, co.marketability)} />
+        <CibiRow label="Ownership Verification" status={labelMap(OWN_LABELS, co.ownership)} notes={co.ownershipDetails} />
+      </CibiSection>
+
+      <CibiSection title="5. Conditions">
+        <CibiRow label="Industry / Market Stability" status={labelMap(MS_LABELS, cn.marketStability)} notes={cn.marketStabilityNotes} />
+        <CibiRow label="Interest Rate Fluctuations" status={labelMap(IR_LABELS, cn.interestRate)} notes={cn.interestRateNotes} />
+      </CibiSection>
+
+      {(cn.riskScore || cn.proposedAction || cn.conditionsForApproval) && (
+        <div className="rounded-md border p-3 space-y-1 bg-muted/30">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">Investigator Recommendation</p>
+          {cn.riskScore && <p className="text-xs">Risk Score: <span className="font-medium">{String(cn.riskScore)} / 100</span></p>}
+          {cn.proposedAction && <p className="text-xs">Proposed Action: <span className="font-medium">{labelMap(PA_LABELS, cn.proposedAction)}</span></p>}
+          {cn.conditionsForApproval && (
+            <p className="text-xs whitespace-pre-wrap">Conditions: {String(cn.conditionsForApproval)}</p>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function ApprovalApplicationActions({
   application,
   currentUserRole,
@@ -80,6 +212,7 @@ export function ApprovalApplicationActions({
       toast.success("Status updated")
       setRejectOpen(false)
       setRejectionReason("")
+      window.dispatchEvent(new Event("activity-log-updated"))
       router.refresh()
     } finally {
       setLoading(false)
@@ -184,10 +317,9 @@ export function ApprovalApplicationActions({
               <AlertDialogTitle>CI/BI Report — 5C&apos;s of Credit</AlertDialogTitle>
             </AlertDialogHeader>
             <div className="mt-2 space-y-6 text-sm max-h-[70vh] overflow-y-auto">
+              {/* CI/BI Summary */}
               <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                  Summary
-                </h3>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Summary</h3>
                 <p>
                   <span className="font-medium text-muted-foreground">CI/BI passed: </span>
                   {application.cibiPassed == null ? (
@@ -200,38 +332,14 @@ export function ApprovalApplicationActions({
                 </p>
               </section>
 
-              <section className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Character
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">{application.characterNotes || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Capacity
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">{application.capacityNotes || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Capital
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">{application.capitalNotes || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Collateral
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">{application.collateralNotes || "—"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Conditions
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">{application.conditionsNotes || "—"}</p>
-                </div>
-              </section>
+              {/* 5 Cs structured view */}
+              <CibiNotesView
+                characterNotes={application.characterNotes}
+                capacityNotes={application.capacityNotes}
+                capitalNotes={application.capitalNotes}
+                collateralNotes={application.collateralNotes}
+                conditionsNotes={application.conditionsNotes}
+              />
 
               {documents.length > 0 && (
                 <section className="space-y-3">

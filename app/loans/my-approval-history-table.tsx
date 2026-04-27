@@ -35,6 +35,7 @@ export function MyApprovalHistoryTable() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [refreshNonce, setRefreshNonce] = useState(0)
 
   useEffect(() => {
     setLoading(true)
@@ -46,7 +47,16 @@ export function MyApprovalHistoryTable() {
       })
       .catch(() => setLogs([]))
       .finally(() => setLoading(false))
-  }, [page])
+  }, [page, refreshNonce])
+
+  useEffect(() => {
+    function onUpdated() {
+      setPage(1)
+      setRefreshNonce((n) => n + 1)
+    }
+    window.addEventListener("activity-log-updated", onUpdated)
+    return () => window.removeEventListener("activity-log-updated", onUpdated)
+  }, [])
 
   const pageCount = Math.max(1, Math.ceil(total / 20))
 

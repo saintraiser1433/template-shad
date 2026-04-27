@@ -2,6 +2,7 @@ import {
   GRACE_PERIOD_DAYS,
   GOOD_STANDING_CBU_MIN,
   RENEWAL_MIN_PAID_PERCENT,
+  type MonthlyScheduleMethod,
 } from "./loan-config"
 
 export type AmortizationRow = {
@@ -14,14 +15,20 @@ export type AmortizationRow = {
 
 /**
  * Compute amortization schedule.
- * For diminishing balance: monthly payment = P * (r(1+r)^n) / ((1+r)^n - 1), then interest = balance * r, principal = PMT - interest.
+ *
+ * **MONTHLY + DIMINISHING:** fixed payment PMT = P*r*(1+r)^n / ((1+r)^n - 1), interest = balance*r,
+ * principal = PMT - interest (split changes each period; total payment stable).
+ *
+ * **MONTHLY + FLAT_ADD_ON:** principal/n each month; interest = P*r each month on original principal (add-on).
+ * Same principal and same interest every month; total due is constant when n and r are fixed.
  */
 export function computeAmortization(
   principal: number,
   ratePerPeriod: number,
   numberOfPeriods: number,
   amortizationType: "MONTHLY" | "DAILY" | "LUMPSUM",
-  startDate: Date
+  startDate: Date,
+  options?: { monthlyScheduleMethod?: MonthlyScheduleMethod }
 ): AmortizationRow[] {
   const rows: AmortizationRow[] = []
   if (amortizationType === "LUMPSUM") {
@@ -61,10 +68,36 @@ export function computeAmortization(
     return rows
   }
 
-  // MONTHLY - diminishing balance
-  let balance = principal
+  // MONTHLY
   const r = ratePerPeriod
   const n = numberOfPeriods
+  const monthlyMethod = options?.monthlyScheduleMethod ?? "FLAT_ADD_ON"
+
+  if (monthlyMethod === "FLAT_ADD_ON") {
+    let remaining = principal
+    const basePrincipal = n > 0 ? principal / n : 0
+    const monthlyInterest = principal * r
+    for (let i = 0; i < n; i++) {
+      const dueDate = new Date(startDate)
+      dueDate.setMonth(dueDate.getMonth() + i + 1)
+      const isLast = i === n - 1
+      const principalPayment = isLast ? remaining : basePrincipal
+      remaining -= principalPayment
+      const interest = monthlyInterest
+      const totalDue = principalPayment + interest
+      rows.push({
+        dueDate,
+        principal: principalPayment,
+        interest,
+        totalDue,
+        sequence: i + 1,
+      })
+    }
+    return rows
+  }
+
+  // DIMINISHING — standard amortization
+  let balance = principal
   const pmt =
     r > 0
       ? (principal * (r * Math.pow(1 + r, n))) / (Math.pow(1 + r, n) - 1)

@@ -13,6 +13,9 @@ export const AMORTIZATION_OPTIONS = [
 
 export type AmortizationOptionValue = (typeof AMORTIZATION_OPTIONS)[number]["value"]
 
+/** How monthly payments split principal vs interest. */
+export type MonthlyScheduleMethod = "DIMINISHING" | "FLAT_ADD_ON"
+
 export type LoanTypeConfig = {
   label: string
   termMonthsMin: number
@@ -23,6 +26,12 @@ export type LoanTypeConfig = {
   interestRate: number // per month or per term as decimal (e.g. 0.03 = 3%)
   interestPeriod: "month" | "term" | "year"
   amortization: AmortizationOptionValue
+  /**
+   * For MONTHLY only. FLAT_ADD_ON: same principal and same interest every month
+   * (add-on / straight-line on original principal). DIMINISHING: standard PMT
+   * with interest on remaining balance (split changes each month, total payment often constant).
+   */
+  monthlyScheduleMethod: MonthlyScheduleMethod
   penaltyRate: number // 2% = 0.02 per month
   penaltyBase: "delayed_amortization" | "outstanding_after_term"
 }
@@ -36,6 +45,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.03,
     interestPeriod: "month",
     amortization: "MONTHLY",
+    monthlyScheduleMethod: "FLAT_ADD_ON",
     penaltyRate: 0.02,
     penaltyBase: "delayed_amortization",
   },
@@ -49,6 +59,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.05,
     interestPeriod: "term",
     amortization: "DAILY",
+    monthlyScheduleMethod: "DIMINISHING",
     penaltyRate: 0.02,
     penaltyBase: "outstanding_after_term",
   },
@@ -60,6 +71,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.03,
     interestPeriod: "month",
     amortization: "MONTHLY",
+    monthlyScheduleMethod: "FLAT_ADD_ON",
     penaltyRate: 0.02,
     penaltyBase: "delayed_amortization",
   },
@@ -71,6 +83,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.10,
     interestPeriod: "term",
     amortization: "LUMPSUM",
+    monthlyScheduleMethod: "DIMINISHING",
     penaltyRate: 0.02,
     penaltyBase: "outstanding_after_term",
   },
@@ -82,6 +95,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.18 / 12,
     interestPeriod: "month",
     amortization: "MONTHLY",
+    monthlyScheduleMethod: "FLAT_ADD_ON",
     penaltyRate: 0.02,
     penaltyBase: "delayed_amortization",
   },
@@ -93,6 +107,7 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0.15 / 12,
     interestPeriod: "month",
     amortization: "MONTHLY",
+    monthlyScheduleMethod: "FLAT_ADD_ON",
     penaltyRate: 0.02,
     penaltyBase: "delayed_amortization",
   },
@@ -104,9 +119,16 @@ export const LOAN_TYPE_CONFIG: Record<LoanType, LoanTypeConfig> = {
     interestRate: 0,
     interestPeriod: "term",
     amortization: "LUMPSUM",
+    monthlyScheduleMethod: "DIMINISHING",
     penaltyRate: 0.02,
     penaltyBase: "outstanding_after_term",
   },
+}
+
+export function getMonthlyScheduleMethodForLoanType(
+  loanType: LoanType
+): MonthlyScheduleMethod {
+  return LOAN_TYPE_CONFIG[loanType].monthlyScheduleMethod
 }
 
 export function getMaxAmountForLoanType(loanType: LoanType, memberCbu: number): number {

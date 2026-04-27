@@ -82,6 +82,7 @@ export function CreateLoanFromApplication({
     }
     toast.success("Loan and voucher created")
     setOpen(false)
+    window.dispatchEvent(new Event("activity-log-updated"))
     router.push(`/loans/${json.id}`)
     router.refresh()
   }

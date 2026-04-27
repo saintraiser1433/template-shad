@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { computeAmortization } from "@/lib/loan-calculator"
+import { getMonthlyScheduleMethodForLoanType } from "@/lib/loan-config"
 
 type AmortizationEnum = "MONTHLY" | "DAILY" | "LUMPSUM"
 
@@ -153,7 +154,12 @@ export function LoanApplicationForm({
       selectedProduct.interestRate,
       periods,
       amortization,
-      new Date()
+      new Date(),
+      amortization === "MONTHLY"
+        ? {
+            monthlyScheduleMethod: getMonthlyScheduleMethodForLoanType("MEMBERSHIP_LOAN"),
+          }
+        : undefined
     )
     if (!rows || rows.length === 0) return null
 
