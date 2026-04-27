@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
-import type { LoanType } from "@prisma/client"
+import { Prisma, type LoanType } from "@prisma/client"
 import { LOAN_TYPE_CONFIG, getMaxAmountForLoanType } from "@/lib/loan-config"
 import { GOOD_STANDING_CBU_MIN } from "@/lib/loan-config"
 import { checkRenewalEligibility } from "@/lib/loan-calculator"
@@ -250,25 +250,58 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const appCount = await prisma.loanApplication.count()
-  const applicationNo = `APP-${String(appCount + 1).padStart(5, "0")}`
+  let application: Awaited<ReturnType<typeof prisma.loanApplication.create>> | null = null
+  const maxAttempts = 5
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const latest = await prisma.loanApplication.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { applicationNo: true },
+      })
+      const latestNum = latest?.applicationNo
+        ? Number(latest.applicationNo.replace("APP-", ""))
+        : 0
+      const applicationNo = `APP-${String((Number.isFinite(latestNum) ? latestNum : 0) + 1).padStart(5, "0")}`
 
-  const application = await prisma.loanApplication.create({
-    data: {
-      applicationNo,
-      memberId,
-      loanType: resolvedLoanType,
-      amount,
-      termMonths: finalTermMonths,
-      termDays: finalTermDays,
-      purpose,
-      status: "PENDING",
-      loanProductId: loanProductId ?? undefined,
-    },
-    include: {
-      member: { select: { name: true, memberNo: true } },
-    },
-  })
+      application = await prisma.loanApplication.create({
+        data: {
+          applicationNo,
+          memberId,
+          loanType: resolvedLoanType,
+          amount,
+          termMonths: finalTermMonths,
+          termDays: finalTermDays,
+          purpose,
+          status: "PENDING",
+          loanProductId: loanProductId ?? undefined,
+        },
+        include: {
+          member: { select: { name: true, memberNo: true } },
+        },
+      })
+      break
+    } catch (e) {
+      const isDuplicateApplicationNo =
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+
+      if (!isDuplicateApplicationNo || attempt === maxAttempts - 1) {
+        console.error("Failed to create loan application:", e)
+        return NextResponse.json(
+          { error: "Failed to create application. Please try again." },
+          { status: 500 }
+        )
+      }
+      // Retry with the next generated application number.
+    }
+  }
+
+  if (!application) {
+    return NextResponse.json(
+      { error: "Failed to create application. Please try again." },
+      { status: 500 }
+    )
+  }
 
   // Notify all collectors that there is a new pending application for CI/BI
   const collectors = await prisma.user.findMany({
